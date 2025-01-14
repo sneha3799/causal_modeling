@@ -126,25 +126,44 @@ class HealthDataStandardizer:
             
             # Store original values for verification
             original_df = df.copy()
-            original_bgl = original_df['bgl'].reset_index(drop=True)
+            original_df['original_index'] = range(len(df))  # Add index to track rows
             
             # Standardize timestamp only
             df = self._standardize_timestamp(df)
-            df = df.sort_values('date')
-            current_bgl = df['bgl'].reset_index(drop=True)
             
-            # Verify no BGL values were modified
-            modified_mask = current_bgl != original_bgl
+            # Check for any timestamps that became NaT during standardization
+            if 'date' in original_df.columns:
+                original_dates = pd.to_datetime(original_df['date'], errors='coerce')
+                new_nat_mask = pd.isna(df['date']) & ~pd.isna(original_dates)
+                if new_nat_mask.any():
+                    nat_comparison = pd.DataFrame({
+                        'original_date': original_dates[new_nat_mask],
+                        'original_bgl': original_df.loc[new_nat_mask, 'bgl'],
+                        'problematic_row_index': new_nat_mask[new_nat_mask].index
+                    })
+                    print("\nWarning: Some timestamps became NaT during standardization:")
+                    print(nat_comparison.head())
+                    print(f"Total new NaT timestamps: {new_nat_mask.sum()}")
+            
+            df = df.sort_values('date')
+            df['original_index'] = original_df['original_index']  # Copy the index to the sorted df
+            
+            # Verify no BGL values were modified by comparing using original index
+            modified_mask = df['bgl'] != original_df.iloc[df['original_index']]['bgl']
+            # Exclude NaT comparisons from the modified mask
+            modified_mask = modified_mask & ~pd.isna(df['bgl']) & ~pd.isna(original_df.iloc[df['original_index']]['bgl'])
             if modified_mask.any():
                 modified_indices = modified_mask[modified_mask].index
                 comparison = pd.DataFrame({
-                    'original': original_bgl[modified_indices],
-                    'modified': current_bgl[modified_indices],
+                    'original': original_df.iloc[df.iloc[modified_indices]['original_index']]['bgl'].values,
+                    'modified': df.iloc[modified_indices]['bgl'].values,
                     'timestamp': df.iloc[modified_indices]['date']
                 })
                 error_msg = f"\nBlood glucose values were modified unexpectedly:\n{comparison.head()}\nTotal modified values: {len(modified_indices)}"
                 raise Exception(error_msg)
             
+            # Now that we're done with comparisons, remove the temporary index column
+            df = df.drop('original_index', axis=1)
             all_bgl.append(df)
         
         # Merge all blood glucose data
