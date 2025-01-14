@@ -1,0 +1,42 @@
+Folder PATH listing
+C:.
+|   500030_5th-7th.csv
+|   500030_7th-9th.csv
+|   679372_5th-7th.csv
+|   679372_7th-9th.csv
+|   data_dictionary.md
+|   directory_structure.txt
+|   glycemic_index_data.csv
+|   glycemic_index_data_no_categories.csv
+|   
+\---fitness
+    +---DailyReadiness
+    |       
+    +---HeartRateVariability
+    |   +---HRVDetails
+    |   |       
+    |   +---HRVSummary
+    |   |       Daily Heart Rate Variability Summary - 2024-04-.csv
+    |   |       Daily Heart Rate Variability Summary - 2024-05-.csv
+    |   |       Daily Heart Rate Variability Summary - 2024-06-.csv
+    |   |       Daily Heart Rate Variability Summary - 2024-07-.csv
+    |   |       Daily Heart Rate Variability Summary - 2024-08-.csv
+    |   |       Daily Heart Rate Variability Summary - 2024-09-.csv
+    |   |       Daily Heart Rate Variability Summary - 2024-10-.csv
+    |   |       Daily Heart Rate Variability Summary - 2024-11-.csv
+    |   |       
+    |   \---RespiratoryRateSummary
+    |           
+    +---SleepScore
+    |       Sleep Profile README.txt
+    |       Sleep Profile.csv
+    |       sleep_score.csv
+    |       
+    +---SPO2
+    |       
+    +---StressScore
+    |       Stress Score Readme.txt
+    |       Stress Score.csv
+    |       
+    \---Temperature
+            
