@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 import pytz
 import glob
 import os
+import sys
 
 class HealthDataStandardizer:
     def __init__(self):
@@ -111,12 +112,7 @@ class HealthDataStandardizer:
         
         files = glob.glob(pattern)
         if not files:
-            print(f"No files found matching pattern: {pattern}")
-            print("Please check:")
-            print("1. The file path is correct")
-            print("2. The files exist in the specified directory")
-            print("3. You have the correct permissions to access the files")
-            return None
+            raise Exception(f"No blood glucose files found matching pattern: {pattern}")
         
         print(f"Found {len(files)} files:")
         for file in files:
@@ -140,16 +136,14 @@ class HealthDataStandardizer:
             # Verify no BGL values were modified
             modified_mask = current_bgl != original_bgl
             if modified_mask.any():
-                print("\nWARNING: Blood glucose values were modified:")
                 modified_indices = modified_mask[modified_mask].index
                 comparison = pd.DataFrame({
                     'original': original_bgl[modified_indices],
                     'modified': current_bgl[modified_indices],
                     'timestamp': df.iloc[modified_indices]['date']
                 })
-                print("\nSample of modified values:")
-                print(comparison.head())
-                print(f"\nTotal modified values: {len(modified_indices)}")
+                error_msg = f"\nBlood glucose values were modified unexpectedly:\n{comparison.head()}\nTotal modified values: {len(modified_indices)}"
+                raise Exception(error_msg)
             
             all_bgl.append(df)
         
@@ -167,8 +161,7 @@ class HealthDataStandardizer:
         all_files = glob.glob(pattern)
         
         if not all_files:
-            print("No daily readiness files found")
-            return None
+            raise Exception("No daily readiness files found")
             
         dfs = []
         for file in all_files:
@@ -186,24 +179,24 @@ class HealthDataStandardizer:
         score_path = self.DATA_PATHS['sleep']['score']
         
         # Process sleep score (this is the main data we care about)
-        if os.path.exists(score_path):
-            print(f"Reading {score_path}")
-            score_df = pd.read_csv(score_path, usecols=['timestamp', 'overall_score', 'deep_sleep_in_minutes', 'resting_heart_rate', 'restlessness'])
-            score_df = self._standardize_timestamp(score_df, 'timestamp')
-            self.data_frames['sleep_score'] = score_df
-        else:
-            print(f"Sleep score file not found: {score_path}")
+        if not os.path.exists(score_path):
+            raise Exception(f"Sleep score file not found: {score_path}")
+            
+        print(f"Reading {score_path}")
+        score_df = pd.read_csv(score_path, usecols=['timestamp', 'overall_score', 'deep_sleep_in_minutes', 'resting_heart_rate', 'restlessness'])
+        score_df = self._standardize_timestamp(score_df, 'timestamp')
+        self.data_frames['sleep_score'] = score_df
         
         # Process sleep profile (only keep essential columns)
-        if os.path.exists(profile_path):
-            print(f"Reading {profile_path}")
-            profile_df = pd.read_csv(profile_path, usecols=['creation_date', 'sleep_type', 'deep_sleep', 'rem_sleep', 'sleep_duration'])
-            profile_df = self._standardize_timestamp(profile_df, 'creation_date')
-            self.data_frames['sleep_profile'] = profile_df
-        else:
-            print(f"Sleep profile file not found: {profile_path}")
+        if not os.path.exists(profile_path):
+            raise Exception(f"Sleep profile file not found: {profile_path}")
+            
+        print(f"Reading {profile_path}")
+        profile_df = pd.read_csv(profile_path, usecols=['creation_date', 'sleep_type', 'deep_sleep', 'rem_sleep', 'sleep_duration'])
+        profile_df = self._standardize_timestamp(profile_df, 'creation_date')
+        self.data_frames['sleep_profile'] = profile_df
         
-        return self.data_frames.get('sleep_profile'), self.data_frames.get('sleep_score')
+        return self.data_frames['sleep_profile'], self.data_frames['sleep_score']
     
     def process_temperature(self):
         """Process temperature data from device and computed temperature files."""
@@ -354,8 +347,7 @@ class HealthDataStandardizer:
         all_files = glob.glob(pattern)
         
         if not all_files:
-            print("No SPO2 files found")
-            return None
+            raise Exception("No SPO2 files found")
             
         dfs = []
         for file in all_files:
@@ -378,8 +370,7 @@ class HealthDataStandardizer:
         
         path = self.DATA_PATHS['stress_score']['path']
         if not os.path.exists(path):
-            print(f"Stress score file not found: {path}")
-            return None
+            raise Exception(f"Stress score file not found: {path}")
             
         print(f"Reading {path}")
         # Only read essential columns
@@ -397,44 +388,44 @@ class HealthDataStandardizer:
         # Process HRV summary data
         summary_pattern = self.DATA_PATHS['hrv']['summary']
         summary_files = glob.glob(summary_pattern)
-        if summary_files:
-            print("\nProcessing HRV summary files...")
-            summary_dfs = []
-            for file in summary_files:
-                print(f"Reading {file}")
-                # Read all columns since HRV summary files are small
-                df = pd.read_csv(file)
-                df = self._standardize_timestamp(df)
-                summary_dfs.append(df)
-                
-                # If we have too many DataFrames, concatenate them
-                if len(summary_dfs) >= 10:
-                    summary_dfs = [pd.concat(summary_dfs, ignore_index=True)]
+        if not summary_files:
+            raise Exception("No HRV summary files found")
+        
+        print("\nProcessing HRV summary files...")
+        summary_dfs = []
+        for file in summary_files:
+            print(f"Reading {file}")
+            # Read all columns since HRV summary files are small
+            df = pd.read_csv(file)
+            df = self._standardize_timestamp(df)
+            summary_dfs.append(df)
             
-            self.data_frames['hrv_summary'] = pd.concat(summary_dfs, ignore_index=True)
-        else:
-            print("No HRV summary files found")
+            # If we have too many DataFrames, concatenate them
+            if len(summary_dfs) >= 10:
+                summary_dfs = [pd.concat(summary_dfs, ignore_index=True)]
+        
+        self.data_frames['hrv_summary'] = pd.concat(summary_dfs, ignore_index=True)
         
         # Process HRV details data
         details_pattern = self.DATA_PATHS['hrv']['details']
         details_files = glob.glob(details_pattern)
-        if details_files:
-            print("\nProcessing HRV details files...")
-            details_dfs = []
-            for file in details_files:
-                print(f"Reading {file}")
-                # Only read essential columns from details files
-                df = pd.read_csv(file, usecols=['timestamp', 'rmssd', 'coverage', 'low_frequency', 'high_frequency'])
-                df = self._standardize_timestamp(df)
-                details_dfs.append(df)
-                
-                # If we have too many DataFrames, concatenate them
-                if len(details_dfs) >= 10:
-                    details_dfs = [pd.concat(details_dfs, ignore_index=True)]
+        if not details_files:
+            raise Exception("No HRV details files found")
+        
+        print("\nProcessing HRV details files...")
+        details_dfs = []
+        for file in details_files:
+            print(f"Reading {file}")
+            # Only read essential columns from details files
+            df = pd.read_csv(file, usecols=['timestamp', 'rmssd', 'coverage', 'low_frequency', 'high_frequency'])
+            df = self._standardize_timestamp(df)
+            details_dfs.append(df)
             
-            self.data_frames['hrv_details'] = pd.concat(details_dfs, ignore_index=True)
-        else:
-            print("No HRV details files found")
+            # If we have too many DataFrames, concatenate them
+            if len(details_dfs) >= 10:
+                details_dfs = [pd.concat(details_dfs, ignore_index=True)]
+        
+        self.data_frames['hrv_details'] = pd.concat(details_dfs, ignore_index=True)
         
         return self.data_frames.get('hrv_summary'), self.data_frames.get('hrv_details')
         
@@ -445,8 +436,7 @@ class HealthDataStandardizer:
         all_files = glob.glob(pattern)
         
         if not all_files:
-            print("No respiratory rate files found")
-            return None
+            raise Exception("No respiratory rate files found")
             
         dfs = []
         for file in all_files:
@@ -459,25 +449,30 @@ class HealthDataStandardizer:
         return self.data_frames['respiratory_rate']
 
 def main():
-    standardizer = HealthDataStandardizer()
-    
-    # Process all data types
-    standardizer.process_blood_glucose()
-    standardizer.process_daily_readiness()
-    standardizer.process_sleep()
-    standardizer.process_temperature()
-    standardizer.process_spo2()
-    standardizer.process_stress_score()
-    standardizer.process_hrv()
-    standardizer.process_respiratory_rate()
-    
-    # Merge all data
-    merged_df = standardizer.merge_all_data()
-    
-    # Save merged dataset
-    output_path = "output/merged_health_data.csv"
-    merged_df.to_csv(output_path, index=False)
-    print(f"\nMerged dataset saved to {output_path}")
+    try:
+        standardizer = HealthDataStandardizer()
+        
+        # Process all data types
+        standardizer.process_blood_glucose()
+        standardizer.process_daily_readiness()
+        standardizer.process_sleep()
+        standardizer.process_temperature()
+        standardizer.process_spo2()
+        standardizer.process_stress_score()
+        standardizer.process_hrv()
+        standardizer.process_respiratory_rate()
+        
+        # Merge all data
+        merged_df = standardizer.merge_all_data()
+        
+        # Save merged dataset
+        output_path = "output/merged_health_data.csv"
+        merged_df.to_csv(output_path, index=False)
+        print(f"\nMerged dataset saved to {output_path}")
+        
+    except Exception as e:
+        print(f"\nError: {str(e)}")
+        sys.exit(1)
 
 if __name__ == "__main__":
     main() 
