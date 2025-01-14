@@ -7,8 +7,36 @@ import os
 
 class HealthDataStandardizer:
     def __init__(self):
-        self.timezone = pytz.timezone('America/New_York')
         self.data_frames = {}
+        self.DATA_PATHS = {
+            'blood_glucose': {
+                'pattern': 'data/679372_*.csv'
+            },
+            'daily_readiness': {
+                'pattern': 'data/fitness/DailyReadiness/Daily Readiness Score - *.csv'
+            },
+            'sleep': {
+                'profile': 'data/fitness/SleepScore/Sleep Profile.csv',
+                'score': 'data/fitness/SleepScore/sleep_score.csv'
+            },
+            'temperature': {
+                'device': 'data/fitness/Temperature/Device Temperature - *.csv',
+                'computed': 'data//fitness/Temperature/Computed Temperature - *.csv'
+            },
+            'spo2': {
+                'pattern': 'data/fitness/SPO2/Minute SpO2 - *.csv'
+            },
+            'stress_score': {
+                'path': 'data/fitness/StressScore/Stress Score.csv'
+            },
+            'hrv': {
+                'summary': 'data/fitness/HeartRateVariability/HRVSummary/Daily Heart Rate Variability Summary - *.csv',
+                'details': 'data/fitness/HeartRateVariability/HRVDetails/Heart Rate Variability Details - *.csv'
+            },
+            'respiratory_rate': {
+                'pattern': 'data/fitness/HeartRateVariability/RespiratoryRateSummary/*.csv'
+            }
+        }
         
     def _standardize_timestamp(self, df, date_col=None):
         """Standardize timestamps to UTC and ensure consistent format."""
@@ -75,9 +103,25 @@ class HealthDataStandardizer:
         
         return df
     
-    def process_blood_glucose(self, pattern='Data/679372_*.csv'):
+    def process_blood_glucose(self):
         """Process blood glucose data from multiple files."""
         print("\nProcessing blood glucose data...")
+        pattern = self.DATA_PATHS['blood_glucose']['pattern']
+        print(f"Looking for files matching pattern: {pattern}")
+        
+        files = glob.glob(pattern)
+        if not files:
+            print(f"No files found matching pattern: {pattern}")
+            print("Please check:")
+            print("1. The file path is correct")
+            print("2. The files exist in the specified directory")
+            print("3. You have the correct permissions to access the files")
+            return None
+        
+        print(f"Found {len(files)} files:")
+        for file in files:
+            print(f"- {file}")
+        
         all_bgl = []
         
         for file in glob.glob(pattern):
@@ -116,9 +160,10 @@ class HealthDataStandardizer:
         self.data_frames['blood_glucose'] = merged_bgl
         return merged_bgl
     
-    def process_daily_readiness(self, pattern='Data/fitness/DailyReadiness/Daily Readiness Score - *.csv'):
+    def process_daily_readiness(self):
         """Process daily readiness scores."""
         print("\nProcessing daily readiness data...")
+        pattern = self.DATA_PATHS['daily_readiness']['pattern']
         all_files = glob.glob(pattern)
         
         if not all_files:
@@ -134,10 +179,11 @@ class HealthDataStandardizer:
         self.data_frames['daily_readiness'] = pd.concat(dfs, ignore_index=True)
         return self.data_frames['daily_readiness']
     
-    def process_sleep(self, profile_path='Data/fitness/SleepScore/Sleep Profile.csv', 
-                     score_path='Data/fitness/SleepScore/sleep_score.csv'):
+    def process_sleep(self):
         """Process sleep data."""
         print("\nProcessing sleep data...")
+        profile_path = self.DATA_PATHS['sleep']['profile']
+        score_path = self.DATA_PATHS['sleep']['score']
         
         # Process sleep score (this is the main data we care about)
         if os.path.exists(score_path):
@@ -164,7 +210,7 @@ class HealthDataStandardizer:
         print("\nProcessing temperature data...")
         
         # Process device temperature files
-        device_pattern = os.path.join("Data", "fitness", "Temperature", "Device Temperature - *.csv")
+        device_pattern = self.DATA_PATHS['temperature']['device']
         device_files = glob.glob(device_pattern)
         device_dfs = []
         
@@ -185,7 +231,7 @@ class HealthDataStandardizer:
             self.device_temperature_df = device_df
         
         # Process computed temperature files
-        computed_pattern = os.path.join("Data", "fitness", "Temperature", "Computed Temperature - *.csv")
+        computed_pattern = self.DATA_PATHS['temperature']['computed']
         computed_files = glob.glob(computed_pattern)
         computed_dfs = []
         
@@ -301,9 +347,10 @@ class HealthDataStandardizer:
         
         return final_df
     
-    def process_spo2(self, pattern='Data/fitness/SPO2/Minute SpO2 - *.csv'):
+    def process_spo2(self):
         """Process SPO2 data."""
         print("\nProcessing SPO2 data...")
+        pattern = self.DATA_PATHS['spo2']['pattern']
         all_files = glob.glob(pattern)
         
         if not all_files:
@@ -325,10 +372,11 @@ class HealthDataStandardizer:
         self.data_frames['spo2'] = pd.concat(dfs, ignore_index=True)
         return self.data_frames['spo2']
     
-    def process_stress_score(self, path='Data/fitness/StressScore/Stress Score.csv'):
+    def process_stress_score(self):
         """Process stress score data."""
         print("\nProcessing stress score data...")
         
+        path = self.DATA_PATHS['stress_score']['path']
         if not os.path.exists(path):
             print(f"Stress score file not found: {path}")
             return None
@@ -342,12 +390,12 @@ class HealthDataStandardizer:
         self.data_frames['stress_score'] = df
         return self.data_frames['stress_score']
     
-    def process_hrv(self, summary_pattern='Data/fitness/HeartRateVariability/HRVSummary/Daily Heart Rate Variability Summary - *.csv',
-                   details_pattern='Data/fitness/HeartRateVariability/HRVDetails/Heart Rate Variability Details - *.csv'):
+    def process_hrv(self):
         """Process heart rate variability data."""
         print("\nProcessing HRV data...")
         
         # Process HRV summary data
+        summary_pattern = self.DATA_PATHS['hrv']['summary']
         summary_files = glob.glob(summary_pattern)
         if summary_files:
             print("\nProcessing HRV summary files...")
@@ -368,6 +416,7 @@ class HealthDataStandardizer:
             print("No HRV summary files found")
         
         # Process HRV details data
+        details_pattern = self.DATA_PATHS['hrv']['details']
         details_files = glob.glob(details_pattern)
         if details_files:
             print("\nProcessing HRV details files...")
@@ -389,9 +438,10 @@ class HealthDataStandardizer:
         
         return self.data_frames.get('hrv_summary'), self.data_frames.get('hrv_details')
         
-    def process_respiratory_rate(self, pattern='Data/fitness/HeartRateVariability/RespiratoryRateSummary/*.csv'):
+    def process_respiratory_rate(self):
         """Process respiratory rate data."""
         print("\nProcessing respiratory rate data...")
+        pattern = self.DATA_PATHS['respiratory_rate']['pattern']
         all_files = glob.glob(pattern)
         
         if not all_files:
@@ -425,7 +475,7 @@ def main():
     merged_df = standardizer.merge_all_data()
     
     # Save merged dataset
-    output_path = "merged_health_data.csv"
+    output_path = "output/merged_health_data.csv"
     merged_df.to_csv(output_path, index=False)
     print(f"\nMerged dataset saved to {output_path}")
 
