@@ -26,9 +26,9 @@ class HealthDataVisualizer:
         
         # Add main BGL trace (keep original scale)
         readings = self.df[self.df['bgl'].notna()].copy()
-        fig.add_trace(go.Scatter(
-            x=readings['timestamp'],
-            y=readings['bgl'],
+            fig.add_trace(go.Scatter(
+                x=readings['timestamp'],
+                y=readings['bgl'],
             mode='lines',
             name='Blood Glucose',
             line=dict(color='blue', width=2),
@@ -345,7 +345,7 @@ class HealthDataVisualizer:
             f.write(html_content)
         
         print("Interactive plot saved to visualizations/health_metrics.html")
-
+        
     def generate_all_plots(self):
         """Generate all visualization plots."""
         os.makedirs('visualizations', exist_ok=True)

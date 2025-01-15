@@ -1,5 +1,0 @@
-timestamp,max_difference,max_difference_pct,n_different_bgls,bgl,msg_type,text,bgl_value_counts
-2024-07-28 18:25:58.617,37.0,34.418604651162795,2,89.0,ANNOUNCE_EXERCISE,120 mins of high intensity exercise,"{89.0: 2, 126.0: 2}"
-2024-07-28 18:25:58.617,37.0,34.418604651162795,2,126.0,ANNOUNCE_EXERCISE,120 mins of high intensity Rowing Machine,"{89.0: 2, 126.0: 2}"
-2024-07-28 18:25:58.617,37.0,34.418604651162795,2,126.0,ANNOUNCE_EXERCISE,120 mins of high intensity Rowing Machine,"{89.0: 2, 126.0: 2}"
-2024-07-28 18:25:58.617,37.0,34.418604651162795,2,89.0,ANNOUNCE_EXERCISE,120 mins of high intensity exercise,"{89.0: 2, 126.0: 2}"

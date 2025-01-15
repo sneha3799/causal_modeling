@@ -1,9 +1,5 @@
 # Ignore everything in misc folder
-misc/*
+data_standardization/misc/*
 
 # Jupyter Notebook
-temp.ipynb
-
-# Python
-__pycache__/
-*.pyc 
+temp.ipynb 
