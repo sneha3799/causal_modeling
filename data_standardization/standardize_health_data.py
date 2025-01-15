@@ -671,6 +671,14 @@ class HealthDataStandardizer:
         # Only read essential columns
         essential_cols = ['DATE', 'STRESS_SCORE', 'SLEEP_POINTS', 'RESPONSIVENESS_POINTS', 'EXERTION_POINTS', 'STATUS']
         df = pd.read_csv(path, usecols=essential_cols)
+        
+        # Filter out rows where stress score is 0 (represents missing/invalid data)
+        n_rows_before = len(df)
+        df = df[df['STRESS_SCORE'] != 0]
+        n_filtered = n_rows_before - len(df)
+        if n_filtered > 0:
+            print(f"Filtered out {n_filtered} rows where stress score was 0 (missing/invalid data)")
+        
         df = self._standardize_timestamp(df, 'DATE')
         
         self.data_frames['stress_score'] = df

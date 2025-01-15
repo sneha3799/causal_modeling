@@ -26,15 +26,15 @@ class HealthDataVisualizer:
         
         # Add main BGL trace (keep original scale)
         readings = self.df[self.df['bgl'].notna()].copy()
-            fig.add_trace(go.Scatter(
-                x=readings['timestamp'],
-                y=readings['bgl'],
-            mode='lines',
-            name='Blood Glucose',
-            line=dict(color='blue', width=2),
-            hovertemplate='<b>BGL:</b> %{y:.1f} mg/dL<br><b>Time:</b> %{x}',
-            legendgroup='glucose',
-            legendgrouptitle_text="Glucose"
+        fig.add_trace(go.Scatter(
+            x=readings['timestamp'],
+            y=readings['bgl'],
+        mode='lines',
+        name='Blood Glucose',
+        line=dict(color='blue', width=2),
+        hovertemplate='<b>BGL:</b> %{y:.1f} mg/dL<br><b>Time:</b> %{x}',
+        legendgroup='glucose',
+        legendgrouptitle_text="Glucose"
         ))
         
         # Add BGL events (keep original scale)
