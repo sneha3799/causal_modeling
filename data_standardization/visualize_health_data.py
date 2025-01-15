@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 import numpy as np
 import os
 import json
+from plotly.subplots import make_subplots
 
 class HealthDataVisualizer:
     def __init__(self, data_path="output/merged_health_data.csv"):
@@ -21,23 +22,29 @@ class HealthDataVisualizer:
         """Plot interactive blood glucose time series with hover data."""
         print("Plotting interactive blood glucose time series...")
         
-        # Create figure with secondary y-axis
-        fig = go.Figure()
+        # Create figure with two subplots sharing x-axis
+        fig = make_subplots(
+            rows=2, cols=1,
+            shared_xaxes=True,
+            vertical_spacing=0.02,
+            row_heights=[0.6, 0.4],  # BGL plot gets more height
+            subplot_titles=('Blood Glucose', 'Health Metrics')
+        )
         
-        # Add main BGL trace (keep original scale)
+        # Add main BGL trace to top subplot
         readings = self.df[self.df['bgl'].notna()].copy()
         fig.add_trace(go.Scatter(
             x=readings['timestamp'],
             y=readings['bgl'],
-        mode='lines',
-        name='Blood Glucose',
-        line=dict(color='blue', width=2),
-        hovertemplate='<b>BGL:</b> %{y:.1f} mg/dL<br><b>Time:</b> %{x}',
-        legendgroup='glucose',
-        legendgrouptitle_text="Glucose"
-        ))
+            mode='lines',
+            name='Blood Glucose',
+            line=dict(color='blue', width=2),
+            hovertemplate='<b>BGL:</b> %{y:.1f} mg/dL<br><b>Time:</b> %{x}',
+            legendgroup='glucose',
+            legendgrouptitle_text="Glucose"
+        ), row=1, col=1)  # Add to first subplot
         
-        # Add BGL events (keep original scale)
+        # Add BGL events to top subplot
         events = readings[readings['msg_type'].notna()]
         event_colors = {
             'DOSE_INSULIN': 'red',
@@ -88,13 +95,13 @@ class HealthDataVisualizer:
             'Deep Sleep': {
                 'original_scale': 'minutes (typically 0-500)',
                 'description': 'Time spent in deep sleep phase.',
-                'modifications': 'Scaled to 0-100 range (divided by 5) for visualization.',
+                'modifications': 'No scaling applied. Shown in original minutes.',
                 'frequency': 'Once daily (total minutes from sleep session).'
             },
             'REM Sleep': {
                 'original_scale': 'minutes (typically 0-500)',
                 'description': 'Time spent in REM sleep phase.',
-                'modifications': 'Scaled to 0-100 range (divided by 5) for visualization.',
+                'modifications': 'No scaling applied. Shown in original minutes.',
                 'frequency': 'Once daily (total minutes from sleep session).'
             },
             'Stress Score': {
@@ -108,6 +115,12 @@ class HealthDataVisualizer:
                 'description': 'Heart Rate Variability - Root Mean Square of Successive Differences.',
                 'modifications': 'Scaled to 0-100 range (multiplied by 100/150) for visualization.',
                 'frequency': 'Measured during sleep, updated several times per night.'
+            },
+            'Readiness Score': {
+                'original_scale': '0-100',
+                'description': 'Overall readiness score indicating recovery and preparedness for activity.',
+                'modifications': 'Scaled to 0-10 range (divided by 10) for better visualization of daily variations.',
+                'frequency': 'Updated daily based on sleep, activity, and recovery metrics.'
             }
         }
         
@@ -134,13 +147,23 @@ class HealthDataVisualizer:
                 visible='legendonly',
                 legendgroup='glucose',
                 legendgrouptitle_text="Glucose"
-            ))
+            ), row=1, col=1)  # Add to first subplot
         
-        # Add Sleep Metrics (normalized to 0-100 scale)
+        # Add target range for BGL to top subplot
+        fig.add_hrect(
+            y0=70, y1=180,
+            fillcolor="lightgreen", opacity=0.1,
+            layer="below", line_width=0,
+            name="Target Range (70-180)",
+            legendgroup='glucose',
+            row=1, col=1
+        )
+        
+        # Add Sleep Metrics to bottom subplot
         sleep_metrics = {
-            'overall_score': {'color': 'purple', 'name': 'Sleep Score', 'scale': 1},  # Already 0-100
-            'deep_sleep_in_minutes': {'color': 'darkblue', 'name': 'Deep Sleep', 'scale': 1/5},  # Typically 0-500 minutes
-            'rem_sleep': {'color': 'lightblue', 'name': 'REM Sleep', 'scale': 1/5}  # Typically 0-500 minutes
+            'overall_score': {'color': 'purple', 'name': 'Sleep Score', 'scale': 1},
+            'deep_sleep_in_minutes': {'color': 'darkblue', 'name': 'Deep Sleep (minutes)', 'scale': 1},
+            'rem_sleep': {'color': 'lightblue', 'name': 'REM Sleep (minutes)', 'scale': 1}
         }
         
         for metric, props in sleep_metrics.items():
@@ -149,26 +172,26 @@ class HealthDataVisualizer:
                 original_values = metric_data[metric].values
                 scaled_values = original_values * props['scale']
                 
+                is_duration = 'sleep' in metric and metric != 'overall_score'
+                hover_template = (
+                    f'<b>{props["name"]}:</b><br>' +
+                    ('Duration: %{y:.1f} minutes<br>' if is_duration else 'Score: %{y:.1f}/100<br>') +
+                    '<b>Time:</b> %{x}'
+                )
+                
                 fig.add_trace(go.Scatter(
                     x=metric_data['timestamp'],
                     y=scaled_values,
                     mode='lines+markers',
                     name=props['name'],
                     line=dict(color=props['color']),
-                    customdata=np.column_stack((original_values, scaled_values)),
-                    hovertemplate=(
-                        f'<b>{props["name"]}:</b><br>' +
-                        'Original: %{customdata[0]:.1f}' + (' minutes' if 'sleep' in metric else '') + '<br>' +
-                        'Normalized: %{customdata[1]:.1f}/100<br>' +
-                        '<b>Time:</b> %{x}'
-                    ),
+                    hovertemplate=hover_template,
                     visible='legendonly',
                     legendgroup='sleep',
-                    legendgrouptitle_text="Sleep",
-                    yaxis='y2'
-                ))
+                    legendgrouptitle_text="Sleep"
+                ), row=2, col=1)  # Add to second subplot
         
-        # Add Stress Score (already 0-100)
+        # Add Stress Score to bottom subplot
         stress_data = self.df[self.df['STRESS_SCORE'].notna()]
         if not stress_data.empty:
             fig.add_trace(go.Scatter(
@@ -181,11 +204,34 @@ class HealthDataVisualizer:
                 hovertemplate='<b>Stress Score:</b> %{customdata:.1f}/100<br><b>Time:</b> %{x}',
                 visible='legendonly',
                 legendgroup='stress',
-                legendgrouptitle_text="Stress",
-                yaxis='y2'
-            ))
+                legendgrouptitle_text="Stress"
+            ), row=2, col=1)  # Add to second subplot
+            
+        # Add Readiness Score to bottom subplot
+        readiness_data = self.df[self.df['readiness_score_value'].notna()]
+        if not readiness_data.empty:
+            original_values = readiness_data['readiness_score_value'].values
+            scaled_values = original_values / 10  # Scale down to 0-10
+            
+            fig.add_trace(go.Scatter(
+                x=readiness_data['timestamp'],
+                y=scaled_values,
+                mode='lines+markers',
+                name='Readiness Score',
+                line=dict(color='orange'),
+                customdata=np.column_stack((original_values, scaled_values)),
+                hovertemplate=(
+                    '<b>Readiness Score:</b><br>' +
+                    'Original: %{customdata[0]:.1f}/100<br>' +
+                    'Normalized: %{customdata[1]:.1f}/10<br>' +
+                    '<b>Time:</b> %{x}'
+                ),
+                visible='legendonly',
+                legendgroup='readiness',
+                legendgrouptitle_text="Readiness"
+            ), row=2, col=1)  # Add to second subplot
         
-        # Add Heart Rate Variability (normalized to 0-100 scale)
+        # Add Heart Rate Variability to bottom subplot
         hrv_data = self.df[self.df['rmssd'].notna()]
         if not hrv_data.empty:
             original_hrv = hrv_data['rmssd'].values
@@ -206,18 +252,50 @@ class HealthDataVisualizer:
                 ),
                 visible='legendonly',
                 legendgroup='hrv',
-                legendgrouptitle_text="Heart Rate",
-                yaxis='y2'
-            ))
+                legendgrouptitle_text="Heart Rate"
+            ), row=2, col=1)  # Add to second subplot
         
-        # Add target range for BGL
-        fig.add_hrect(
-            y0=70, y1=180,
-            fillcolor="lightgreen", opacity=0.1,
-            layer="below", line_width=0,
-            name="Target Range (70-180)",
-            legendgroup='glucose'
+        # Update layout
+        fig.update_layout(
+            height=1000,  # Increased height for better visualization
+            showlegend=True,
+            legend=dict(
+                yanchor="top",
+                y=0.99,
+                xanchor="left",
+                x=1.05,
+                bgcolor="rgba(255, 255, 255, 0.8)",
+                groupclick="toggleitem"
+            ),
+            margin=dict(r=150, t=60, b=100),  # Added bottom margin for range selector
+            # Bottom subplot x-axis (with range selector)
+            xaxis2=dict(
+                rangeslider=dict(visible=True),
+                rangeselector=dict(
+                    buttons=list([
+                        dict(count=6, label="6h", step="hour", stepmode="backward"),
+                        dict(count=12, label="12h", step="hour", stepmode="backward"),
+                        dict(count=1, label="1d", step="day", stepmode="backward"),
+                        dict(count=3, label="3d", step="day", stepmode="backward"),
+                        dict(count=7, label="1w", step="day", stepmode="backward"),
+                        dict(step="all", label="All")
+                    ]),
+                    y=1.1,  # Position above the plot
+                    x=0,  # Align to left
+                    font=dict(size=12),
+                    bgcolor='rgba(150, 200, 250, 0.4)',
+                    activecolor='rgba(150, 200, 250, 0.8)'
+                )
+            ),
+            # Top subplot x-axis (no controls, just shared zoom)
+            xaxis=dict(
+                showticklabels=False  # Hide x-axis labels for top subplot
+            )
         )
+        
+        # Update y-axis labels
+        fig.update_yaxes(title_text="Blood Glucose (mg/dL)", row=1, col=1)
+        fig.update_yaxes(title_text="Scores / Duration (minutes)", row=2, col=1)
         
         # Create description text with grid styling
         description_html = """
@@ -292,47 +370,8 @@ class HealthDataVisualizer:
         </script>
         """ % json.dumps(descriptions)
         
-        # Update layout with normalized secondary y-axis
-        fig.update_layout(
-            title='Health Metrics Over Time',
-            xaxis_title='Time',
-            yaxis_title='Blood Glucose (mg/dL)',
-            yaxis2=dict(
-                title='Normalized Scale (0-100)',
-                overlaying='y',
-                side='right',
-                range=[0, 100],  # Fix range for normalized metrics
-                showgrid=False
-            ),
-            hovermode='closest',
-            height=800,
-            showlegend=True,
-            legend=dict(
-                yanchor="top",
-                y=0.99,
-                xanchor="left",
-                x=1.15,
-                bgcolor="rgba(255, 255, 255, 0.8)",
-                groupclick="toggleitem"
-            ),
-            margin=dict(r=200),
-            xaxis=dict(
-                rangeslider=dict(visible=True),
-                rangeselector=dict(
-                    buttons=list([
-                        dict(count=6, label="6h", step="hour", stepmode="backward"),
-                        dict(count=12, label="12h", step="hour", stepmode="backward"),
-                        dict(count=1, label="1d", step="day", stepmode="backward"),
-                        dict(count=3, label="3d", step="day", stepmode="backward"),
-                        dict(count=7, label="1w", step="day", stepmode="backward"),
-                        dict(step="all", label="All")
-                    ])
-                )
-            )
-        )
-        
         # Save plot with descriptions
-        os.makedirs('visualizations', exist_ok=True)
+        os.makedirs('docs', exist_ok=True)
         html_content = fig.to_html(
             include_plotlyjs=True,
             full_html=True,
@@ -341,19 +380,19 @@ class HealthDataVisualizer:
         # Insert description section and script before </body>
         html_content = html_content.replace('</body>', description_html + description_script + '</body>')
         
-        with open('visualizations/health_metrics.html', 'w', encoding='utf-8') as f:
+        with open('docs/index.html', 'w', encoding='utf-8') as f:
             f.write(html_content)
         
-        print("Interactive plot saved to visualizations/health_metrics.html")
-        
+        print("Interactive plot saved to docs/index.html")
+
     def generate_all_plots(self):
         """Generate all visualization plots."""
-        os.makedirs('visualizations', exist_ok=True)
+        os.makedirs('docs', exist_ok=True)
         
         # Generate interactive time series plot
         self.plot_bgl_time_series()
         
-        print("\nAll visualizations have been generated in the 'visualizations' directory.")
+        print("\nAll visualizations have been generated in the 'docs' directory.")
 
 def main():
     visualizer = HealthDataVisualizer()

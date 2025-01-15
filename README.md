@@ -136,7 +136,7 @@ The visualization tool (`data_standardization/visualize_health_data.py`) creates
    ```bash
    python data_standardization/visualize_health_data.py
    ```
-   This generates `visualizations/health_metrics.html`
+   This generates `docs/index.html` which can be viewed at https://your-username.github.io/repository-name/
 
 2. **Interacting with the Plot**
    - Click legend items to show/hide metrics
