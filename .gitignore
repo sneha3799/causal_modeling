@@ -1,0 +1,9 @@
+# Ignore everything in misc folder
+misc/*
+
+# Jupyter Notebook
+temp.ipynb
+
+# Python
+__pycache__/
+*.pyc 

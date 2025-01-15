@@ -2,7 +2,7 @@ import pandas as pd
 import warnings
 from datetime import timedelta
 
-def validate_health_data(csv_path='merged_health_data.csv'):
+def validate_health_data(csv_path='output/merged_health_data.csv'):
     """
     Validate and analyze the merged health dataset.
     

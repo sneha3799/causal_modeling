@@ -5,7 +5,7 @@ import numpy as np
 import os
 
 class HealthDataVisualizer:
-    def __init__(self, data_path="merged_health_data.csv"):
+    def __init__(self, data_path="output/merged_health_data.csv"):
         print("Loading data...")
         self.df = pd.read_csv(data_path, low_memory=False)
         self.df['timestamp'] = pd.to_datetime(self.df['timestamp'])
