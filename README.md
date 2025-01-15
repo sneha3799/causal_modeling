@@ -8,7 +8,7 @@ This repository consists of two main components:
 ## Part 1: Health Data Processing
 
 ### Overview
-The data processing pipeline standardizes and combines data from multiple sources, ensuring consistent timestamps, handling duplicates, and merging related data points. The process is implemented in `data_standardization/standardize_health_data.py`.
+The data processing pipeline standardizes and combines data from Gluroo's app and FitBit exported data files, ensuring consistent timestamps, handling duplicates, and merging related data points. The process is implemented in `data_standardization/standardize_health_data.py`.
 
 ### Data Sources
 ```
