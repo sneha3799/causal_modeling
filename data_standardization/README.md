@@ -37,7 +37,7 @@ These event-triggered measurements complement the regular interval data, providi
 ### 2. File Organization
 
 #### Single File per Time Range
-- Blood Glucose: CSV files covering ~2-3 days each
+- Blood Glucose: CSV files covering a few months each
   - Example: `679372_5th-7th.csv`, `679372_7th-9th.csv`
 - Sleep Profile: One consolidated file
   - Example: `Sleep Profile.csv`
@@ -97,5 +97,3 @@ These event-triggered measurements complement the regular interval data, providi
 - `standardize_health_data.py`: Main data processing script
 - `validate_health_data.py`: Data validation and quality checks
 - `visualize_health_data.py`: Interactive visualization
-- `check_specific_conflict.py`: Tool for investigating specific timestamp conflicts
-- `investigate_bgl_conflicts.py`: Analysis of blood glucose conflicts 

@@ -13,9 +13,9 @@ The data processing pipeline standardizes and combines data from Gluroo's app an
 ### Data Sources
 ```
 data/
-├── *_5th-7th.csv                 # Blood glucose data files
-├── *_7th-9th.csv                 # Blood glucose data files
-└── fitness/
+├── {user_id}_5th-7th.csv                 # Gluroo data months 5-7
+├── {user_id}_7th-9th.csv                 # Gluroo data months 7-9
+└── fitness/ # FitBit data
     ├── DailyReadiness/
     │   └── Daily Readiness Score - *.csv
     ├── HeartRateVariability/
@@ -59,14 +59,14 @@ Each data source provides specific health metrics:
    - Special handling for rows with same timestamp but different information:
      
      a. **Blood Glucose**:
-     - Prioritizes sensor readings with valid trend values (not 'NONE')
+     - Prioritizes sensor readings using reporting of valid trend values (not 'NONE')
      - If multiple readings with valid trends exist:
        - Uses average if values are within 5% of each other
        - Raises error if difference exceeds 5%
      - Preserves associated metadata (trend direction, device info)
      
      b. **Insulin Doses**:
-     - Sums doses only for same insulin type at same timestamp
+     - Sums doses for same insulin type at same timestamp
      - Example: At 2024-05-21 18:16:00
        - DOSE_INSULIN: 4u + 1u = 5u total regular insulin
        - DOSE_BASAL_INSULIN: 4u Toujeo (kept separate)
@@ -74,7 +74,7 @@ Each data source provides specific health metrics:
      - Preserves information about automatic vs manual doses
      
      c. **Food Amounts**:
-     - Sums carbohydrates only for same food type at same timestamp
+     - Sums carbohydrates for same food type at same timestamp
      - Example: At 2024-05-21 18:16:00
        - "Skittles": 5g + 10g = 15g total
        - "Apple": 25g (kept separate)
@@ -98,7 +98,7 @@ Each data source provides specific health metrics:
 4. **Merging Process**
    - Concatenates data from multiple files
    - Sorts by timestamp
-   - Handles overlapping time periods
+   - Handles overlapping time periods and inconsistent logging frequency
    - Preserves all relevant metadata
 
 ## Interactive Visualization
@@ -136,54 +136,20 @@ The visualization tool (`data_standardization/visualize_health_data.py`) creates
    ```bash
    python data_standardization/visualize_health_data.py
    ```
-   This generates `docs/index.html` which can be viewed at https://your-username.github.io/repository-name/
+   This generates `docs/index.html` which can be viewed at https://blood-glucose-control.github.io/causal_modeling/
 
-2. **Interacting with the Plot**
-   - Click legend items to show/hide metrics
-   - Use time controls to focus on specific periods
-   - Hover over points for detailed information
-   - Click and drag to zoom
-   - Double-click to reset view
-
-3. **Understanding the Metrics**
+2. **Understanding the Metrics**
    - Blood Glucose: Original scale (mg/dL)
    - Sleep Metrics: Normalized from minutes to 0-100 scale
    - Stress Score: Original 0-100 scale
    - HRV: Normalized from milliseconds to 0-100 scale
 
-4. **Event Types**
+3. **Event Types**
    - DOSE_INSULIN: Regular insulin doses
    - DOSE_BASAL_INSULIN: Long-acting insulin
    - ANNOUNCE_MEAL: Meal announcements
    - INTERVENTION_SNACK: Fast-acting carbs
    - BGL_FP_READING: Finger prick readings
-
-## Data Processing Notes
-
-1. **Insulin Doses**
-   - Multiple doses at same timestamp are summed
-   - Preserves distinction between regular and basal insulin
-   - Frequency: Event-based (when administered)
-
-2. **Meal Announcements**
-   - Multiple food amounts at same timestamp are summed
-   - Includes glycemic index information
-   - Frequency: Event-based (when consumed)
-
-3. **Blood Glucose Readings**
-   - Prioritizes sensor readings with valid trends
-   - Handles conflicts within 5% difference
-   - Frequency: Every 5 minutes from CGM
-
-4. **Sleep Metrics**
-   - Normalized to 0-100 scale for comparison
-   - Original values preserved in hover data
-   - Frequency: Daily totals
-
-5. **Stress and HRV**
-   - Stress: Original 0-100 scale
-   - HRV: Normalized from typical 0-150ms range
-   - Frequency: Throughout day/night
 
 ## Part 2: Causal Modeling
 
