@@ -25,7 +25,8 @@ class HealthDataStandardizer:
                 'computed': 'data//fitness/Temperature/Computed Temperature - *.csv'
             },
             'spo2': {
-                'pattern': 'data/fitness/SPO2/Minute SpO2 - *.csv'
+                'pattern': 'data/fitness/SPO2/Minute SpO2 - *.csv',
+                'daily_pattern': 'data/fitness/SPO2/Daily SpO2 - *.csv'
             },
             'stress_score': {
                 'path': 'data/fitness/StressScore/Stress Score.csv'
@@ -478,7 +479,8 @@ class HealthDataStandardizer:
             raise Exception(f"Sleep score file not found: {score_path}")
             
         print(f"Reading {score_path}")
-        score_df = pd.read_csv(score_path, usecols=['timestamp', 'overall_score', 'deep_sleep_in_minutes', 'resting_heart_rate', 'restlessness'])
+        score_df = pd.read_csv(score_path, usecols=['timestamp', 'overall_score', 'composition_score', 'revitalization_score', 
+                                                    'duration_score', 'deep_sleep_in_minutes', 'resting_heart_rate', 'restlessness'])
         score_df = self._standardize_timestamp(score_df, 'timestamp')
         self.data_frames['sleep_score'] = score_df
         
@@ -487,7 +489,9 @@ class HealthDataStandardizer:
             raise Exception(f"Sleep profile file not found: {profile_path}")
             
         print(f"Reading {profile_path}")
-        profile_df = pd.read_csv(profile_path, usecols=['creation_date', 'sleep_type', 'deep_sleep', 'rem_sleep', 'sleep_duration'])
+        profile_df = pd.read_csv(profile_path, usecols=['creation_date', 'sleep_type', 'deep_sleep', 'rem_sleep', 'sleep_duration', 'sleep_start_time', 
+                                                        'schedule_variability', 'restorative_sleep', 'time_before_sound_sleep',	'sleep_stability', 
+                                                        'nights_with_long_awakenings', 'days_with_naps'])
         profile_df = self._standardize_timestamp(profile_df, 'creation_date')
         self.data_frames['sleep_profile'] = profile_df
         
@@ -639,24 +643,43 @@ class HealthDataStandardizer:
         """Process SPO2 data."""
         print("\nProcessing SPO2 data...")
         pattern = self.DATA_PATHS['spo2']['pattern']
-        all_files = glob.glob(pattern)
+        daily_pattern = self.DATA_PATHS['spo2']['daily_pattern']
         
+        # Process minute-level SPO2 data
+        all_files = glob.glob(pattern)
         if not all_files:
             raise Exception("No SPO2 files found")
-            
         dfs = []
         for file in all_files:
             print(f"Reading {file}")
-            # Only read timestamp and value columns
             df = pd.read_csv(file, usecols=['timestamp', 'value'])
             df = self._standardize_timestamp(df)
             dfs.append(df)
-            
-            # If we have too many DataFrames, concatenate them to save memory
             if len(dfs) >= 10:
                 dfs = [pd.concat(dfs, ignore_index=True)]
-        
-        self.data_frames['spo2'] = pd.concat(dfs, ignore_index=True)
+        minute_spo2_df = pd.concat(dfs, ignore_index=True)
+
+        # Process daily-level SPO2 data
+        daily_files = glob.glob(daily_pattern)
+        if not daily_files:
+            raise Exception("No daily SPO2 files found")
+        daily_dfs = []
+        for file in daily_files:
+            print(f"Reading {file}")
+            df = pd.read_csv(file, usecols=['timestamp', 'average_value', 'lower_bound', 'upper_bound'])
+            df = self._standardize_timestamp(df)
+            df = df.rename(columns={
+                'average_value': 'spo2_daily_average_value',
+                'lower_bound': 'spo2_daily_lower_bound',
+                'upper_bound': 'spo2_daily_upper_bound'
+            })
+            daily_dfs.append(df)
+            if len(daily_dfs) >= 10:
+                daily_dfs = [pd.concat(daily_dfs, ignore_index=True)]
+        daily_spo2_df = pd.concat(daily_dfs, ignore_index=True)
+
+        # Merge minute and daily SPO2 data
+        self.data_frames['spo2'] = pd.merge(minute_spo2_df, daily_spo2_df, on='timestamp', how='outer')
         return self.data_frames['spo2']
     
     def process_stress_score(self):
@@ -669,9 +692,12 @@ class HealthDataStandardizer:
             
         print(f"Reading {path}")
         # Only read essential columns
-        essential_cols = ['DATE', 'STRESS_SCORE', 'SLEEP_POINTS', 'RESPONSIVENESS_POINTS', 'EXERTION_POINTS', 'STATUS']
+        essential_cols = ['DATE', 'STRESS_SCORE', 'SLEEP_POINTS', 'RESPONSIVENESS_POINTS', 'EXERTION_POINTS', 'STATUS', 'CALCULATION_FAILED']
         df = pd.read_csv(path, usecols=essential_cols)
         
+        # Remove rows where STATUS is 'NO_DATA' or CALCULATION_FAILED is True
+        df = df[(df['STATUS'] != 'NO_DATA') & (df['CALCULATION_FAILED'] != True)]
+
         # Filter out rows where stress score is 0 (represents missing/invalid data)
         n_rows_before = len(df)
         df = df[df['STRESS_SCORE'] != 0]
