@@ -119,46 +119,156 @@ class HealthDataStandardizer:
         for file in files:
             print(f"- {file}")
         
+        # First pass: determine date ranges for each file
+        file_ranges = {}
+        for file in files:
+            df = pd.read_csv(file, usecols=['date'])
+            # Use format='mixed' to handle various datetime formats including milliseconds and timezone offsets
+            df['date'] = pd.to_datetime(df['date'], format='mixed')
+            file_ranges[file] = {
+                'start': df['date'].min(),
+                'end': df['date'].max(),
+                'n_rows': len(df)
+            }
+            print(f"\n{file}:")
+            print(f"Date range: {file_ranges[file]['start']} to {file_ranges[file]['end']}")
+            print(f"Number of rows: {file_ranges[file]['n_rows']}")
+        
+        # Sort files by start date
+        sorted_files = sorted(files, key=lambda x: file_ranges[x]['start'])
+        
+        # Initialize cutoff_dates dictionary
+        cutoff_dates = {}
+        
+        # Check for overlaps and verify data consistency
+        for i in range(len(sorted_files)-1):
+            current_file = sorted_files[i]
+            next_file = sorted_files[i+1]
+            if file_ranges[current_file]['end'] >= file_ranges[next_file]['start']:
+                overlap_start = file_ranges[next_file]['start']
+                overlap_end = file_ranges[current_file]['end']
+                print(f"\nWARNING: Found overlap between files:")
+                print(f"- {current_file}: {file_ranges[current_file]['start']} to {file_ranges[current_file]['end']}")
+                print(f"- {next_file}: {file_ranges[next_file]['start']} to {file_ranges[next_file]['end']}")
+                print(f"Overlap period: {overlap_start} to {overlap_end}")
+                
+                # Read overlapping portions from both files
+                df1 = pd.read_csv(current_file, low_memory=False)
+                df2 = pd.read_csv(next_file, low_memory=False)
+                df1['date'] = pd.to_datetime(df1['date'], format='mixed')
+                df2['date'] = pd.to_datetime(df2['date'], format='mixed')
+                
+                # Extract overlapping data
+                overlap1 = df1[df1['date'] >= overlap_start]
+                overlap2 = df2[df2['date'] <= overlap_end]
+                
+                # Sort both by date for comparison
+                overlap1 = overlap1.sort_values('date')
+                overlap2 = overlap2.sort_values('date')
+                
+                # Get all unique dates from both dataframes
+                all_dates = pd.concat([overlap1['date'], overlap2['date']]).unique()
+                all_dates = np.sort(all_dates)  # Use numpy's sort instead of calling sort directly
+                
+                # Compare data for each date
+                inconsistencies = []
+                for date in all_dates:
+                    rows1 = overlap1[overlap1['date'] == date]
+                    rows2 = overlap2[overlap2['date'] == date]
+                    
+                    # If one file has data for a date and the other doesn't, that's an inconsistency
+                    if len(rows1) == 0 or len(rows2) == 0:
+                        if len(rows1) > 0:
+                            inconsistencies.append({
+                                'date': date,
+                                'issue': f"Data only in {current_file}",
+                                'rows': rows1
+                            })
+                        else:
+                            inconsistencies.append({
+                                'date': date,
+                                'issue': f"Data only in {next_file}",
+                                'rows': rows2
+                            })
+                        continue
+                    
+                    # Compare all relevant columns
+                    cols_to_compare = ['bgl', 'trend', 'msg_type', 'text', 'dose_units', 'food_g']
+                    for col in cols_to_compare:
+                        if col not in rows1.columns or col not in rows2.columns:
+                            continue
+                            
+                        vals1 = set(rows1[col].dropna())
+                        vals2 = set(rows2[col].dropna())
+                        
+                        if vals1 != vals2:
+                            inconsistencies.append({
+                                'date': date,
+                                'issue': f"Different {col} values",
+                                'file1_values': vals1,
+                                'file2_values': vals2,
+                                'rows1': rows1[[col, 'date', 'msg_type', 'text']],
+                                'rows2': rows2[[col, 'date', 'msg_type', 'text']]
+                            })
+                
+                if inconsistencies:
+                    print("\nWARNING: Found inconsistencies in overlapping data:")
+                    for inc in inconsistencies:
+                        print(f"\nDate: {inc['date']}")
+                        print(f"Issue: {inc['issue']}")
+                        if 'file1_values' in inc:
+                            print(f"Values in {current_file}: {inc['file1_values']}")
+                            print(f"Values in {next_file}: {inc['file2_values']}")
+                            print("\nRows from first file:")
+                            print(inc['rows1'])
+                            print("\nRows from second file:")
+                            print(inc['rows2'])
+                        else:
+                            print("Rows:")
+                            print(inc['rows'])
+                    
+                    raise ValueError("Found inconsistencies in overlapping data between files. Please verify data integrity.")
+                else:
+                    print("\nVerified: Overlapping data is consistent between files.")
+                    # Now we can safely use the cutoff
+                    cutoff_dates[current_file] = file_ranges[next_file]['start']
+                    print(f"Using data from {current_file} up to {cutoff_dates[current_file]}")
+        
         all_bgl = []
         
-        for file in glob.glob(pattern):
+        # Process each file with cutoffs
+        for file in sorted_files:
             print(f"\nReading {file}")
             df = pd.read_csv(file, low_memory=False)
+            df['date'] = pd.to_datetime(df['date'], format='mixed')
+            
+            # Apply cutoff if exists
+            if file in cutoff_dates:
+                n_before = len(df)
+                df = df[df['date'] < cutoff_dates[file]]
+                n_filtered = n_before - len(df)
+                if n_filtered > 0:
+                    print(f"Filtered out {n_filtered} rows after cutoff date {cutoff_dates[file]}")
             
             # Store original values for verification
             original_df = df.copy()
-            original_df['original_index'] = range(len(df))  # Add index to track rows
+            original_df['original_index'] = range(len(df))
             
-            # Standardize timestamp only
+            # Standardize timestamp
             df = self._standardize_timestamp(df)
             
-            # Remove exact duplicates first (where all columns are identical)
+            # Remove exact duplicates
             n_before = len(df)
             df = df.drop_duplicates(keep='first')
             n_removed = n_before - len(df)
             if n_removed > 0:
                 print(f"Removed {n_removed} exact duplicate rows (all columns matched)")
             
-            # Check for any timestamps that became NaT during standardization
-            if 'date' in original_df.columns:
-                original_dates = pd.to_datetime(original_df['date'], errors='coerce')
-                new_nat_mask = pd.isna(df['date']) & ~pd.isna(original_dates)
-                if new_nat_mask.any():
-                    nat_comparison = pd.DataFrame({
-                        'original_date': original_dates[new_nat_mask],
-                        'original_bgl': original_df.loc[new_nat_mask, 'bgl'],
-                        'problematic_row_index': new_nat_mask[new_nat_mask].index
-                    })
-                    print("\nWarning: Some timestamps became NaT during standardization:")
-                    print(nat_comparison.head())
-                    print(f"Total new NaT timestamps: {new_nat_mask.sum()}")
-            
             df = df.sort_values('date')
-            df['original_index'] = original_df['original_index']  # Copy the index to the sorted df
+            df['original_index'] = original_df['original_index']
             
-            # Verify no BGL values were modified by comparing using original index
+            # Verify no BGL values were modified
             modified_mask = df['bgl'] != original_df.iloc[df['original_index']]['bgl']
-            # Exclude NaT comparisons from the modified mask
             modified_mask = modified_mask & ~pd.isna(df['bgl']) & ~pd.isna(original_df.iloc[df['original_index']]['bgl'])
             if modified_mask.any():
                 modified_indices = modified_mask[modified_mask].index
@@ -170,7 +280,6 @@ class HealthDataStandardizer:
                 error_msg = f"\nBlood glucose values were modified unexpectedly:\n{comparison.head()}\nTotal modified values: {len(modified_indices)}"
                 raise Exception(error_msg)
             
-            # Now that we're done with comparisons, remove the temporary index column
             df = df.drop('original_index', axis=1)
             all_bgl.append(df)
         
@@ -461,11 +570,30 @@ class HealthDataStandardizer:
             
         dfs = []
         for file in all_files:
+            print(f"Reading {file}")
             df = pd.read_csv(file)
-            df = self._standardize_timestamp(df)
+            # Standardize timestamp first
+            df = self._standardize_timestamp(df, 'date')
+            # Rename date column to timestamp to match other dataframes
+            df = df.rename(columns={'date': 'timestamp'})
+            # Then rename other columns to match expected names in visualization
+            df = df.rename(columns={
+                'readiness_score_value': 'daily_readiness_readiness_score_value',
+                'readiness_state': 'daily_readiness_readiness_state',
+                'activity_subcomponent': 'daily_readiness_activity_subcomponent',
+                'sleep_subcomponent': 'daily_readiness_sleep_subcomponent',
+                'hrv_subcomponent': 'daily_readiness_hrv_subcomponent'
+            })
             dfs.append(df)
         
-        self.data_frames['daily_readiness'] = pd.concat(dfs, ignore_index=True)
+        merged_df = pd.concat(dfs, ignore_index=True)
+        # Sort by timestamp
+        merged_df = merged_df.sort_values('timestamp')
+        print(f"\nDaily readiness data shape: {merged_df.shape}")
+        print("\nSample of daily readiness data:")
+        print(merged_df.head())
+        
+        self.data_frames['daily_readiness'] = merged_df
         return self.data_frames['daily_readiness']
     
     def process_sleep(self):
@@ -546,28 +674,43 @@ class HealthDataStandardizer:
             self.computed_temperature_df = computed_df
     
     def create_base_timeline(self):
-        """Create minute-by-minute timeline covering all data."""
+        """Create timeline covering all data, ensuring no data points are lost."""
         print("\nCreating base timeline...")
         
         # Start with blood glucose data range as it's our primary focus
         if 'blood_glucose' in self.data_frames and self.data_frames['blood_glucose'] is not None:
             bgl_df = self.data_frames['blood_glucose']
-            start_date = bgl_df['date'].min()
-            end_date = bgl_df['date'].max()
             
-            # Add a small buffer (1 day) on each end
-            start_date -= pd.Timedelta(days=1)
-            end_date += pd.Timedelta(days=1)
+            # Get all unique timestamps from blood glucose data
+            bgl_timestamps = pd.to_datetime(bgl_df['date'].unique())
             
-            # Create timeline
+            # Find the overall min and max timestamps
+            start_date = bgl_timestamps.min()
+            end_date = bgl_timestamps.max()
+            
+            print(f"Blood glucose data range:")
+            print(f"- Start: {start_date}")
+            print(f"- End: {end_date}")
+            print(f"- Unique timestamps: {len(bgl_timestamps):,}")
+            
+            # Create 5-minute interval timeline
             timeline = pd.date_range(
-                start=start_date,
-                end=end_date,
-                freq='min'
+                start=start_date.floor('5min'),  # Round down to nearest 5 minutes
+                end=end_date.ceil('5min'),    # Round up to nearest 5 minutes
+                freq='5min'
             )
             
-            base_df = pd.DataFrame({'timestamp': timeline})
-            base_df = self._standardize_timestamp(base_df, 'timestamp')
+            # Create base DataFrame with both the 5-minute intervals and any original timestamps
+            all_timestamps = np.union1d(timeline, bgl_timestamps)
+            base_df = pd.DataFrame({'timestamp': all_timestamps})
+            base_df = base_df.sort_values('timestamp')
+            
+            # Print statistics about the timeline
+            print("\nTimeline statistics:")
+            print(f"- Total timestamps: {len(base_df):,}")
+            print(f"- 5-minute intervals: {len(timeline):,}")
+            print(f"- Additional timestamps: {len(base_df) - len(timeline):,}")
+            
             return base_df
         else:
             raise ValueError("Blood glucose data is required to create the base timeline")
@@ -576,25 +719,48 @@ class HealthDataStandardizer:
         """Merge all processed datasets."""
         print("\nMerging all datasets...")
         
+        # First determine blood glucose time range
+        if 'blood_glucose' not in self.data_frames:
+            raise ValueError("Blood glucose data is required for merging")
+            
+        bgl_df = self.data_frames['blood_glucose']
+        bgl_start = bgl_df['date'].min()
+        bgl_end = bgl_df['date'].max()
+        print(f"\nBlood glucose data range: {bgl_start} to {bgl_end}")
+        print("Will only keep other health metrics within this time range.")
+        
         # Create base timeline
         final_df = self.create_base_timeline()
-        print(f"Base timeline created: {len(final_df):,} minutes")
+        print(f"Base timeline created: {len(final_df):,} rows")
+        
+        # Print data statistics before merging
+        print("\nData statistics before merging:")
+        for name, df in self.data_frames.items():
+            if df is not None and not df.empty:
+                print(f"\n{name}:")
+                print(f"- Rows: {len(df):,}")
+                time_cols = [col for col in df.columns if any(
+                    term in col.lower() for term in ['time', 'date', 'timestamp']
+                )]
+                if time_cols:
+                    time_col = time_cols[0]
+                    print(f"- Time range: {df[time_col].min()} to {df[time_col].max()}")
+                    print(f"- Unique timestamps: {df[time_col].nunique():,}")
         
         # Merge blood glucose data first (our primary data)
-        if 'blood_glucose' in self.data_frames:
-            bgl_df = self.data_frames['blood_glucose'].copy()
-            
-            # Merge on exact timestamp
-            final_df = pd.merge(
-                final_df,
-                bgl_df,
-                left_on='timestamp',
-                right_on='date',
-                how='left'
-            )
-            
-            # Clear memory
-            del bgl_df
+        final_df = pd.merge(
+            final_df,
+            bgl_df,
+            left_on='timestamp',
+            right_on='date',
+            how='outer'  # Keep all timestamps
+        )
+        print(f"\nAfter merging blood glucose: {len(final_df):,} rows")
+        print(f"Unique timestamps: {final_df['timestamp'].nunique():,}")
+        print(f"Non-null BGL values: {final_df['bgl'].count():,}")
+        
+        # Clear memory
+        del bgl_df
         
         # Merge other data types (readiness, sleep, etc.)
         for name, df in self.data_frames.items():
@@ -612,30 +778,79 @@ class HealthDataStandardizer:
             if time_cols:
                 # Use only the first timestamp column
                 primary_time_col = time_cols[0]
+                print(f"Merging on {primary_time_col}")
+                
+                # Filter data to blood glucose time range
+                n_before = len(merge_df)
+                merge_df = merge_df[
+                    (merge_df[primary_time_col] >= bgl_start) & 
+                    (merge_df[primary_time_col] <= bgl_end)
+                ]
+                n_filtered = n_before - len(merge_df)
+                if n_filtered > 0:
+                    print(f"Filtered out {n_filtered:,} rows outside blood glucose time range")
+                if len(merge_df) == 0:
+                    print(f"No {name} data within blood glucose time range")
+                    continue
+                
+                # Print data statistics before merge
+                print(f"Before merge:")
+                print(f"- Rows in incoming data: {len(merge_df):,}")
+                print(f"- Unique timestamps in incoming data: {merge_df[primary_time_col].nunique():,}")
+                
+                # Add prefix to all non-timestamp columns to identify source
+                cols_to_rename = [col for col in merge_df.columns if col not in time_cols]
+                merge_df = merge_df.rename(columns={col: f"{name}_{col}" for col in cols_to_rename})
                 
                 # Merge on timestamp
+                n_rows_before = len(final_df)
+                n_unique_timestamps_before = final_df['timestamp'].nunique()
+                
                 final_df = pd.merge(
                     final_df,
                     merge_df,
                     left_on='timestamp',
                     right_on=primary_time_col,
-                    how='left',
-                    suffixes=('', f'_{name}')
+                    how='outer'  # Keep all timestamps
                 )
+                
+                # Print merge statistics
+                print("\nAfter merge:")
+                print(f"- Total rows: {len(final_df):,} (changed by {len(final_df) - n_rows_before:+,})")
+                print(f"- Unique timestamps: {final_df['timestamp'].nunique():,} (changed by {final_df['timestamp'].nunique() - n_unique_timestamps_before:+,})")
+                
+                # Check for any data loss
+                added_cols = [col for col in final_df.columns if col.startswith(name)]
+                for col in added_cols:
+                    orig_count = merge_df[col.replace(f"{name}_", "")].count() if col.replace(f"{name}_", "") in merge_df.columns else 0
+                    final_count = final_df[col].count()
+                    if final_count != orig_count:
+                        print(f"Warning: Possible data loss in column {col}")
+                        print(f"- Original non-null values: {orig_count:,}")
+                        print(f"- Final non-null values: {final_count:,}")
+                
+                print(f"Added columns: {[col for col in final_df.columns if col.startswith(name)]}")
                 
                 # Clear memory
                 del merge_df
         
-        # Remove any duplicate columns
-        final_df = final_df.loc[:, ~final_df.columns.duplicated()]
+        # Sort by timestamp
+        final_df = final_df.sort_values('timestamp')
+        
+        # Remove any duplicate timestamp columns
+        timestamp_cols = [col for col in final_df.columns if any(
+            term in col.lower() for term in ['time', 'date', 'timestamp']
+        )]
+        for col in timestamp_cols:
+            if col != 'timestamp':
+                final_df = final_df.drop(columns=col)
         
         print(f"\nFinal dataset shape: {final_df.shape}")
         print("\nColumns in final dataset:")
         for col in sorted(final_df.columns):
-            print(f"- {col}")
-        
-        print("\nMissing value percentages:")
-        print(final_df.isnull().mean() * 100)
+            non_null = final_df[col].count()
+            pct_present = (non_null / len(final_df)) * 100
+            print(f"- {col}: {non_null:,} non-null values ({pct_present:.1f}%)")
         
         return final_df
     
@@ -754,7 +969,8 @@ class HealthDataStandardizer:
             if len(details_dfs) >= 10:
                 details_dfs = [pd.concat(details_dfs, ignore_index=True)]
         
-        self.data_frames['hrv_details'] = pd.concat(details_dfs, ignore_index=True)
+        details_df = pd.concat(details_dfs, ignore_index=True)
+        self.data_frames['hrv_details'] = details_df
         
         return self.data_frames.get('hrv_summary'), self.data_frames.get('hrv_details')
         

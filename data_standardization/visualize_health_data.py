@@ -19,8 +19,26 @@ class HealthDataVisualizer:
         print(self.df.head())
         
     def plot_bgl_time_series(self):
-        """Plot interactive blood glucose time series with hover data."""
-        print("Plotting interactive blood glucose time series...")
+        """Generate interactive blood glucose time series plot."""
+        print("\nPlotting interactive blood glucose time series...")
+        
+        # Debug: Print data statistics
+        print("\nData statistics:")
+        for col in sorted(self.df.columns):
+            non_null = self.df[col].count()
+            if non_null > 0:
+                print(f"- {col}: {non_null:,} non-null values")
+                if col == 'timestamp':
+                    # Analyze timestamp distribution
+                    timestamps = pd.to_datetime(self.df['timestamp'].dropna())
+                    time_diffs = timestamps.sort_values().diff()
+                    print("  Timestamp intervals:")
+                    print("  - Min:", time_diffs.min())
+                    print("  - Max:", time_diffs.max())
+                    print("  - Median:", time_diffs.median())
+                    interval_counts = time_diffs.value_counts().sort_index()
+                    print("  Most common intervals:")
+                    print(interval_counts.head().to_string())
         
         # Create figure with two subplots sharing x-axis
         fig = make_subplots(
@@ -33,6 +51,10 @@ class HealthDataVisualizer:
         
         # Add main BGL trace to top subplot
         readings = self.df[self.df['bgl'].notna()].copy()
+        # Sort by timestamp to ensure correct line connections
+        readings = readings.sort_values('timestamp')
+        
+        # Add BGL line trace
         fig.add_trace(go.Scatter(
             x=readings['timestamp'],
             y=readings['bgl'],
@@ -42,7 +64,19 @@ class HealthDataVisualizer:
             hovertemplate='<b>BGL:</b> %{y:.1f} mg/dL<br><b>Time:</b> %{x}',
             legendgroup='glucose',
             legendgrouptitle_text="Glucose"
-        ), row=1, col=1)  # Add to first subplot
+        ), row=1, col=1)
+        
+        # Add markers for actual readings to show exact data points
+        fig.add_trace(go.Scatter(
+            x=readings['timestamp'],
+            y=readings['bgl'],
+            mode='markers',
+            name='BGL Readings',
+            marker=dict(color='blue', size=4),
+            hovertemplate='<b>BGL:</b> %{y:.1f} mg/dL<br><b>Time:</b> %{x}',
+            legendgroup='glucose',
+            showlegend=False
+        ), row=1, col=1)
         
         # Add BGL events to top subplot
         events = readings[readings['msg_type'].notna()]
@@ -112,9 +146,15 @@ class HealthDataVisualizer:
             },
             'HRV (RMSSD)': {
                 'original_scale': 'milliseconds (typically 0-150)',
-                'description': 'Heart Rate Variability - Root Mean Square of Successive Differences.',
-                'modifications': 'Scaled to 0-100 range (multiplied by 100/150) for visualization.',
-                'frequency': 'Measured during sleep, updated several times per night.'
+                'description': 'Heart Rate Variability - Root Mean Square of Successive Differences. Measured during sleep/rest periods for highest accuracy.',
+                'modifications': 'Scaled to 0-100 range (multiplied by 100/150) for visualization. Only high-quality readings (coverage ≥ 80%) are shown.',
+                'frequency': 'Every 5 minutes during sleep/rest periods only.'
+            },
+            'Non-REM Heart Rate': {
+                'original_scale': 'beats per minute (typically 40-100)',
+                'description': 'Heart rate measured during non-REM sleep phases.',
+                'modifications': 'No scaling applied. Original beats per minute.',
+                'frequency': 'Once per sleep session.'
             },
             'Readiness Score': {
                 'original_scale': '0-100',
@@ -131,23 +171,38 @@ class HealthDataVisualizer:
             type_events = events[events['msg_type'] == msg_type]
             color = event_colors.get(msg_type, 'gray')
             
+            # Create customdata array based on event type
+            if msg_type == 'ANNOUNCE_MEAL':
+                customdata = type_events[['trend', 'text', 'food_g', 'food_glycemic_index']].fillna('').values
+                hovertemplate = (
+                    '<b>BGL:</b> %{y:.1f} mg/dL<br>' +
+                    '<b>Time:</b> %{x}<br>' +
+                    '<b>Trend:</b> %{customdata[0]}<br>' +
+                    '<b>Food:</b> %{customdata[1]}<br>' +
+                    '<b>Carbs:</b> %{customdata[2]:.1f}g<br>' +
+                    '<b>Glycemic Index:</b> %{customdata[3]:.1f}'
+                )
+            else:
+                customdata = type_events[['trend', 'text']].fillna('').values
+                hovertemplate = (
+                    '<b>BGL:</b> %{y:.1f} mg/dL<br>' +
+                    '<b>Time:</b> %{x}<br>' +
+                    '<b>Trend:</b> %{customdata[0]}<br>' +
+                    '<b>Note:</b> %{customdata[1]}'
+                )
+            
             fig.add_trace(go.Scatter(
                 x=type_events['timestamp'],
                 y=type_events['bgl'],
                 mode='markers',
                 name=msg_type,
                 marker=dict(size=8, color=color),
-                customdata=type_events[['trend', 'text']].fillna('').values,
-                hovertemplate=(
-                    '<b>BGL:</b> %{y:.1f} mg/dL<br>' +
-                    '<b>Time:</b> %{x}<br>' +
-                    '<b>Trend:</b> %{customdata[0]}<br>' +
-                    '<b>Note:</b> %{customdata[1]}'
-                ),
+                customdata=customdata,
+                hovertemplate=hovertemplate,
                 visible='legendonly',
                 legendgroup='glucose',
                 legendgrouptitle_text="Glucose"
-            ), row=1, col=1)  # Add to first subplot
+            ), row=1, col=1)
         
         # Add target range for BGL to top subplot
         fig.add_hrect(
@@ -161,9 +216,9 @@ class HealthDataVisualizer:
         
         # Add Sleep Metrics to bottom subplot
         sleep_metrics = {
-            'overall_score': {'color': 'purple', 'name': 'Sleep Score', 'scale': 1},
-            'deep_sleep_in_minutes': {'color': 'darkblue', 'name': 'Deep Sleep (minutes)', 'scale': 1},
-            'rem_sleep': {'color': 'lightblue', 'name': 'REM Sleep (minutes)', 'scale': 1}
+            'sleep_score_overall_score': {'color': 'purple', 'name': 'Sleep Score', 'scale': 1},
+            'sleep_score_deep_sleep_in_minutes': {'color': 'darkblue', 'name': 'Deep Sleep (minutes)', 'scale': 1},
+            'sleep_profile_rem_sleep': {'color': 'lightblue', 'name': 'REM Sleep (minutes)', 'scale': 1}
         }
         
         for metric, props in sleep_metrics.items():
@@ -172,7 +227,7 @@ class HealthDataVisualizer:
                 original_values = metric_data[metric].values
                 scaled_values = original_values * props['scale']
                 
-                is_duration = 'sleep' in metric and metric != 'overall_score'
+                is_duration = 'sleep' in metric and 'score' not in metric
                 hover_template = (
                     f'<b>{props["name"]}:</b><br>' +
                     ('Duration: %{y:.1f} minutes<br>' if is_duration else 'Score: %{y:.1f}/100<br>') +
@@ -191,68 +246,148 @@ class HealthDataVisualizer:
                     legendgrouptitle_text="Sleep"
                 ), row=2, col=1)  # Add to second subplot
         
-        # Add Stress Score to bottom subplot
-        stress_data = self.df[self.df['STRESS_SCORE'].notna()]
+        # Add Sleep Stability to bottom subplot
+        if 'sleep_profile_sleep_stability' in self.df.columns:
+            stability_data = self.df[self.df['sleep_profile_sleep_stability'].notna()]
+            if not stability_data.empty:
+                fig.add_trace(go.Scatter(
+                    x=stability_data['timestamp'],
+                    y=stability_data['sleep_profile_sleep_stability'],
+                    mode='lines+markers',
+                    name='Sleep Stability',
+                    line=dict(color='darkgreen'),
+                    customdata=np.column_stack((
+                        stability_data['sleep_profile_sleep_stability'],
+                        stability_data['sleep_profile_nights_with_long_awakenings'],
+                        stability_data['sleep_profile_days_with_naps']
+                    )),
+                    hovertemplate=(
+                        '<b>Sleep Stability:</b><br>' +
+                        'Wake Events: %{y:.1f} per hour<br>' +
+                        'Long Awakenings: %{customdata[1]:.1f}%<br>' +
+                        'Days with Naps: %{customdata[2]:.1f}%<br>' +
+                        '<b>Time:</b> %{x}'
+                    ),
+                    visible='legendonly',
+                    legendgroup='sleep',
+                    legendgrouptitle_text="Sleep"
+                ), row=2, col=1)
+        
+        # Add SPO2 data to bottom subplot
+        if 'spo2_value' in self.df.columns:
+            spo2_data = self.df[self.df['spo2_value'].notna()]
+            if not spo2_data.empty:
+                fig.add_trace(go.Scatter(
+                    x=spo2_data['timestamp'],
+                    y=spo2_data['spo2_value'],
+                    mode='markers',
+                    name='SpO2',
+                    marker=dict(size=4, color='cyan'),
+                    customdata=np.column_stack((
+                        spo2_data['spo2_value'],
+                        spo2_data['spo2_spo2_daily_average_value'].fillna(''),
+                        spo2_data['spo2_spo2_daily_lower_bound'].fillna(''),
+                        spo2_data['spo2_spo2_daily_upper_bound'].fillna('')
+                    )),
+                    hovertemplate=(
+                        '<b>SpO2:</b> %{y:.1f}%<br>' +
+                        '<b>Daily Average:</b> %{customdata[1]:.1f}%<br>' +
+                        '<b>Range:</b> %{customdata[2]:.1f}% - %{customdata[3]:.1f}%<br>' +
+                        '<b>Time:</b> %{x}'
+                    ),
+                    visible='legendonly',
+                    legendgroup='vitals',
+                    legendgrouptitle_text="Vital Signs"
+                ), row=2, col=1)
+        
+        # Update Stress Score to include more details
+        stress_data = self.df[self.df['stress_score_STRESS_SCORE'].notna()]
         if not stress_data.empty:
             fig.add_trace(go.Scatter(
                 x=stress_data['timestamp'],
-                y=stress_data['STRESS_SCORE'],
+                y=stress_data['stress_score_STRESS_SCORE'],
                 mode='lines+markers',
                 name='Stress Score',
                 line=dict(color='red'),
-                customdata=stress_data['STRESS_SCORE'],
-                hovertemplate='<b>Stress Score:</b> %{customdata:.1f}/100<br><b>Time:</b> %{x}',
+                customdata=np.column_stack((
+                    stress_data['stress_score_STRESS_SCORE'],
+                    stress_data['stress_score_SLEEP_POINTS'].fillna(0),
+                    stress_data['stress_score_RESPONSIVENESS_POINTS'].fillna(0),
+                    stress_data['stress_score_EXERTION_POINTS'].fillna(0),
+                    stress_data['stress_score_STATUS'].fillna('')
+                )),
+                hovertemplate=(
+                    '<b>Stress Score:</b> %{customdata[0]:.1f}/100<br>' +
+                    '<b>Components:</b><br>' +
+                    'Sleep: %{customdata[1]:.1f}<br>' +
+                    'Responsiveness: %{customdata[2]:.1f}<br>' +
+                    'Exertion: %{customdata[3]:.1f}<br>' +
+                    '<b>Status:</b> %{customdata[4]}<br>' +
+                    '<b>Time:</b> %{x}'
+                ),
                 visible='legendonly',
                 legendgroup='stress',
                 legendgrouptitle_text="Stress"
-            ), row=2, col=1)  # Add to second subplot
-            
-        # Add Readiness Score to bottom subplot
-        readiness_data = self.df[self.df['readiness_score_value'].notna()]
+            ), row=2, col=1)
+        
+        # Update Readiness Score to include state information
+        readiness_data = self.df[self.df['daily_readiness_daily_readiness_readiness_score_value'].notna()]
         if not readiness_data.empty:
-            original_values = readiness_data['readiness_score_value'].values
-            scaled_values = original_values / 10  # Scale down to 0-10
+            customdata = np.column_stack((
+                readiness_data['daily_readiness_daily_readiness_readiness_score_value'],
+                readiness_data['daily_readiness_daily_readiness_readiness_score_value'] / 10,
+                readiness_data['daily_readiness_daily_readiness_readiness_state'].fillna(''),
+                readiness_data['daily_readiness_daily_readiness_activity_subcomponent'].fillna(0),
+                readiness_data['daily_readiness_daily_readiness_sleep_subcomponent'].fillna(0),
+                readiness_data['daily_readiness_daily_readiness_hrv_subcomponent'].fillna(0),
+                readiness_data['daily_readiness_activity_state'].fillna(''),
+                readiness_data['daily_readiness_sleep_state'].fillna(''),
+                readiness_data['daily_readiness_hrv_state'].fillna('')
+            ))
             
             fig.add_trace(go.Scatter(
                 x=readiness_data['timestamp'],
-                y=scaled_values,
+                y=customdata[:, 1],  # Use scaled values (0-10)
                 mode='lines+markers',
                 name='Readiness Score',
                 line=dict(color='orange'),
-                customdata=np.column_stack((original_values, scaled_values)),
+                customdata=customdata,
                 hovertemplate=(
                     '<b>Readiness Score:</b><br>' +
-                    'Original: %{customdata[0]:.1f}/100<br>' +
-                    'Normalized: %{customdata[1]:.1f}/10<br>' +
+                    'Score: %{customdata[0]:.1f}/100 (%{customdata[1]:.1f}/10)<br>' +
+                    'State: %{customdata[2]}<br>' +
+                    '<b>Components:</b><br>' +
+                    'Activity: %{customdata[3]:.1f} (%{customdata[6]})<br>' +
+                    'Sleep: %{customdata[4]:.1f} (%{customdata[7]})<br>' +
+                    'HRV: %{customdata[5]:.1f} (%{customdata[8]})<br>' +
                     '<b>Time:</b> %{x}'
                 ),
-                visible='legendonly',
+                visible=True,
                 legendgroup='readiness',
                 legendgrouptitle_text="Readiness"
-            ), row=2, col=1)  # Add to second subplot
+            ), row=2, col=1)
         
-        # Add Heart Rate Variability to bottom subplot
-        hrv_data = self.df[self.df['rmssd'].notna()]
-        if not hrv_data.empty:
-            original_hrv = hrv_data['rmssd'].values
-            scaled_hrv = original_hrv * (100/150)  # Assuming typical range 0-150ms
-            
+        # Add HRV (RMSSD) data
+        if 'hrv_details_rmssd' in self.df.columns:
             fig.add_trace(go.Scatter(
-                x=hrv_data['timestamp'],
-                y=scaled_hrv,
-                mode='lines+markers',
+                x=self.df['timestamp'],
+                y=self.df['hrv_details_rmssd'] * (100/150),  # Scale to 0-100
+                mode='markers',
                 name='HRV (RMSSD)',
-                line=dict(color='pink'),
-                customdata=np.column_stack((original_hrv, scaled_hrv)),
-                hovertemplate=(
-                    '<b>HRV:</b><br>' +
-                    'Original: %{customdata[0]:.1f} ms<br>' +
-                    'Normalized: %{customdata[1]:.1f}/100<br>' +
-                    '<b>Time:</b> %{x}'
-                ),
-                visible='legendonly',
+                marker=dict(size=6, color='purple'),
                 legendgroup='hrv',
-                legendgrouptitle_text="Heart Rate"
+                legendgrouptitle_text="Heart Metrics"
+            ), row=2, col=1)  # Add to second subplot
+
+        # Add Non-REM Heart Rate data
+        if 'hrv_summary_nremhr' in self.df.columns:
+            fig.add_trace(go.Scatter(
+                x=self.df['timestamp'],
+                y=self.df['hrv_summary_nremhr'],
+                mode='markers',
+                name='Non-REM Heart Rate',
+                marker=dict(size=6, color='darkred'),
+                legendgroup='hrv'
             ), row=2, col=1)  # Add to second subplot
         
         # Update layout
@@ -290,7 +425,29 @@ class HealthDataVisualizer:
             # Top subplot x-axis (no controls, just shared zoom)
             xaxis=dict(
                 showticklabels=False  # Hide x-axis labels for top subplot
-            )
+            ),
+            # Add buttons for showing/hiding all traces
+            updatemenus=[
+                dict(
+                    type="buttons",
+                    direction="right",
+                    x=1.05,
+                    y=1.1,
+                    showactive=True,
+                    buttons=[
+                        dict(
+                            label="Show All",
+                            method="update",
+                            args=[{"visible": True}]
+                        ),
+                        dict(
+                            label="Hide All",
+                            method="update",
+                            args=[{"visible": False}]
+                        )
+                    ]
+                )
+            ]
         )
         
         # Update y-axis labels
@@ -384,6 +541,64 @@ class HealthDataVisualizer:
             f.write(html_content)
         
         print("Interactive plot saved to docs/index.html")
+
+        # Add sleep periods as shaded regions
+        if 'sleep_profile_sleep_start_time' in self.df.columns and 'sleep_profile_sleep_duration' in self.df.columns:
+            sleep_data = self.df[self.df['sleep_profile_sleep_start_time'].notna()]
+            for idx, row in sleep_data.iterrows():
+                start_time = pd.to_datetime(row['sleep_profile_sleep_start_time'])
+                duration_mins = row['sleep_profile_sleep_duration']
+                end_time = start_time + pd.Timedelta(minutes=duration_mins)
+                
+                # Add shaded region for sleep period
+                fig.add_vrect(
+                    x0=start_time,
+                    x1=end_time,
+                    fillcolor="gray",
+                    opacity=0.2,
+                    layer="below",
+                    line_width=0,
+                    name="Sleep Period",
+                    legendgroup="activities",
+                    legendgrouptitle_text="Activities"
+                )
+
+        # Add workout periods based on stress score exertion points
+        if 'stress_score_EXERTION_POINTS' in self.df.columns:
+            workout_data = self.df[self.df['stress_score_EXERTION_POINTS'] > 80]  # High exertion indicates workout
+            for idx, row in workout_data.iterrows():
+                # Add markers for workout periods
+                fig.add_vline(
+                    x=row['timestamp'],
+                    line_width=2,
+                    line_color="orange",
+                    opacity=0.5,
+                    name="High Activity",
+                    legendgroup="activities"
+                )
+
+        # Add annotations for activity status
+        if 'stress_score_STATUS' in self.df.columns:
+            status_data = self.df[self.df['stress_score_STATUS'].notna()]
+            for status in status_data['stress_score_STATUS'].unique():
+                status_times = status_data[status_data['stress_score_STATUS'] == status]
+                fig.add_trace(go.Scatter(
+                    x=status_times['timestamp'],
+                    y=[0] * len(status_times),  # Place at bottom of plot
+                    mode='markers',
+                    name=f"Status: {status}",
+                    marker=dict(
+                        symbol='triangle-up',
+                        size=8,
+                        color=dict(
+                            REST='blue',
+                            ACTIVITY='orange',
+                            STRESS='red'
+                        ).get(status, 'gray')
+                    ),
+                    legendgroup="activities",
+                    showlegend=True
+                ), row=1, col=1)
 
     def generate_all_plots(self):
         """Generate all visualization plots."""
