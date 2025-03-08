@@ -3,3 +3,6 @@ data_standardization/misc/*
 
 # Jupyter Notebook
 temp.ipynb 
+
+# Python
+\venv
