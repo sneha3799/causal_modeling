@@ -140,6 +140,25 @@ def plot_counterfactual_comparison(datasets, title="Insulin Dose Counterfactual 
             ),
             text=[f'{c}g carbs' for c in meal_sizes],
             hovertemplate='%{text}<br>Glucose: %{y:.0f} mg/dL'
+         ))
+        
+        # Add markers for insulin doses (from the baseline scenario)
+        insulin_times = baseline_df[baseline_df['insulin'] > 0].index
+        insulin_values = baseline_df.loc[insulin_times, 'glucose'] 
+        insulin_sizes = baseline_df.loc[insulin_times, 'insulin']
+        
+        fig.add_trace(go.Scatter(
+            x=insulin_times,
+            y=insulin_values,
+            mode='markers',
+            name='Insulin Doses',
+            marker=dict(
+                color='red',
+                symbol='triangle-down',
+                size=insulin_sizes*2 + 8,  # Scale to make visible
+            ),
+            text=[f'{i:.1f} units' for i in insulin_sizes],
+            hovertemplate='%{text}<br>Glucose: %{y:.0f} mg/dL'
         ))
     
     # Add range guidelines
