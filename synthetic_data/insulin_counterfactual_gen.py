@@ -56,7 +56,6 @@ def generate_insulin_counterfactuals(days=7, insulin_factors=[0.8, 0.9, 1.0, 1.1
         # Pre-calculate all effects
         for t in range(1, len(modified_data)):
             current_time = modified_data.index[t]
-            minutes_since_midnight = (current_time.hour * 60 + current_time.minute)
             
             # Calculate lagged insulin effects
             for past_t in range(max(0, t - base_generator.params['insulin_duration']//5), t):
@@ -186,7 +185,7 @@ def generate_metrics(datasets):
     metrics_df = pd.DataFrame(metrics)
     return metrics_df
 
-def save_counterfactual_datasets(datasets, output_dir="data/counterfactuals"):
+def save_counterfactual_datasets(datasets, output_dir="./synthetic_data/data/counterfactuals"):
     """
     Save all counterfactual datasets to CSV files.
     """
@@ -200,8 +199,12 @@ def save_counterfactual_datasets(datasets, output_dir="data/counterfactuals"):
 
 if __name__ == "__main__":
     # Create output directories
-    os.makedirs('visualizations/counterfactuals', exist_ok=True)
-    os.makedirs('data/counterfactuals', exist_ok=True)
+    base_dir = "./synthetic_data"
+    vis_dir = os.path.join(base_dir, "visualizations", "counterfactuals")
+    data_dir = os.path.join(base_dir, "data", "counterfactuals")
+    
+    os.makedirs(vis_dir, exist_ok=True)
+    os.makedirs(data_dir, exist_ok=True)
     
     # Generate counterfactual datasets with different insulin factors
     insulin_factors = [0.8, 0.9, 1.0, 1.1, 1.2]
@@ -212,12 +215,12 @@ if __name__ == "__main__":
     )
     
     # Save datasets
-    save_counterfactual_datasets(counterfactual_datasets)
+    save_counterfactual_datasets(counterfactual_datasets, output_dir=data_dir)
     
     # Generate comparison visualization
     print("Generating comparison visualizations...")
     full_comparison = plot_counterfactual_comparison(counterfactual_datasets)
-    full_comparison.write_html('visualizations/counterfactuals/insulin_counterfactuals_comparison.html')
+    full_comparison.write_html(os.path.join(vis_dir, 'insulin_counterfactuals_comparison.html'))
     
     # Generate a 24-hour sample for detailed view
     sample_start = list(counterfactual_datasets.values())[0].index[0] + timedelta(days=3)
@@ -231,12 +234,12 @@ if __name__ == "__main__":
         sample_datasets, 
         title="24-Hour Insulin Dose Comparison (Day 4)"
     )
-    sample_comparison.write_html('visualizations/counterfactuals/insulin_counterfactuals_24h_sample.html')
+    sample_comparison.write_html(os.path.join(vis_dir, 'insulin_counterfactuals_24h_sample.html'))
     
     # Generate metrics report
     print("Calculating metrics...")
     metrics = generate_metrics(counterfactual_datasets)
-    metrics.to_csv('data/counterfactuals/insulin_counterfactual_metrics.csv', index=False)
+    metrics.to_csv(os.path.join(data_dir, 'insulin_counterfactual_metrics.csv'), index=False)
     
     print("\nCounterfactual data generation complete!")
     print(f"Generated {len(counterfactual_datasets)} scenarios with factors: {', '.join(map(str, insulin_factors))}")
@@ -244,9 +247,9 @@ if __name__ == "__main__":
     
     print("\nFiles saved:")
     print("  Visualizations:")
-    print("    - visualizations/counterfactuals/insulin_counterfactuals_comparison.html")
-    print("    - visualizations/counterfactuals/insulin_counterfactuals_24h_sample.html")
+    print(f"    - {os.path.join(vis_dir, 'insulin_counterfactuals_comparison.html')}")
+    print(f"    - {os.path.join(vis_dir, 'insulin_counterfactuals_24h_sample.html')}")
     print("  Data:")
-    print("    - data/counterfactuals/insulin_counterfactual_metrics.csv")
+    print(f"    - {os.path.join(data_dir, 'insulin_counterfactual_metrics.csv')}")
     for factor in insulin_factors:
-        print(f"    - data/counterfactuals/insulin_factor_{str(factor).replace('.', '_')}.csv")
+        print(f"    - {os.path.join(data_dir, f'insulin_factor_{str(factor).replace('.', '_')}.csv')}")
