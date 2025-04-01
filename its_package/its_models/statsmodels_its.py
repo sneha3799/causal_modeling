@@ -4,6 +4,12 @@ import matplotlib.pyplot as plt
 import statsmodels.formula.api as smf
 from .base import BaseITSModel
 import os
+import pickle
+from datetime import datetime
+import warnings
+
+# Suppress specific statsmodels warnings
+warnings.filterwarnings("ignore", message="Unknown keyword arguments", category=FutureWarning)
 
 class StatsmodelsITSModel(BaseITSModel):
     """ITS model using statsmodels."""
@@ -166,3 +172,36 @@ class StatsmodelsITSModel(BaseITSModel):
             return self.results.predict(cf_data)
         else:
             return self.results.predict()
+    
+    def save_model(self, filename=None):
+        """
+        Save the trained model to a file.
+        
+        Parameters:
+        -----------
+        filename : str, optional
+            Path to save the model. If None, a default name will be used.
+        """
+        if self.results is None:
+            raise ValueError("Model has not been trained. Call fit() first.")
+        
+        if filename is None:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"statsmodels_its_model_{timestamp}.pkl"
+        
+        model_data = {
+            'model': self.results,
+            'type': 'statsmodels_its',
+            'info': {
+                'training_time': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                'target_col': self.target_col,
+                'intervention_time': self.intervention_time,
+                'formula': self.formula
+            }
+        }
+        
+        with open(filename, 'wb') as f:
+            pickle.dump(model_data, f)
+        
+        print(f"Model saved to {filename}")
+        return filename

@@ -9,6 +9,10 @@ import warnings
 
 # Suppress scipy stats warnings about small sample sizes
 warnings.filterwarnings("ignore", message=".*p-value may be inaccurate with fewer than 20 observations.*")
+# Suppress CausalImpact pandas warnings
+warnings.filterwarnings("ignore", message="Series.__getitem__ treating keys as positions is deprecated", category=FutureWarning)
+# Suppress statsmodels warnings about unknown parameters
+warnings.filterwarnings("ignore", message="Unknown keyword arguments", category=FutureWarning)
 
 from ..its_models.causalimpact_model import CausalImpactModel
 from ..its_models.statsmodels_its import StatsmodelsITSModel
