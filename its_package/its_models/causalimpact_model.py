@@ -124,11 +124,7 @@ class CausalImpactModel(BaseITSModel):
         if self.impact is None:
             raise ValueError("Model not fitted yet")
         
-        # Generate the plot
-        if fig is None:
-            fig = plt.figure(figsize=figsize)
-        
-        self.impact.plot(fig=fig)
+        fig = self.impact.plot()
         
         return fig
     
