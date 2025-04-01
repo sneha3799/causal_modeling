@@ -69,6 +69,7 @@ class CausalImpactModel(BaseITSModel):
         
         # Fit the model
         self.impact = CausalImpact(clean_data, pre_period, post_period)
+        self.impact.run()
         
         return self
     
