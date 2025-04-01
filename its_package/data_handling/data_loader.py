@@ -98,7 +98,7 @@ def prepare_window_data(data, event_time, pre_window, post_window,
     
     # Forward fill missing values if needed
     if ffill:
-        window_data = window_data.fillna(method='ffill')
+        window_data = window_data.ffill()
     
     # Convert index to timestamp if requested
     if convert_timestamps:

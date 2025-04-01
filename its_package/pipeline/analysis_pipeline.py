@@ -5,6 +5,10 @@ import matplotlib.pyplot as plt
 from datetime import datetime
 from math import sqrt
 import sklearn.metrics as metrics
+import warnings
+
+# Suppress scipy stats warnings about small sample sizes
+warnings.filterwarnings("ignore", message=".*p-value may be inaccurate with fewer than 20 observations.*")
 
 from ..its_models.causalimpact_model import CausalImpactModel
 from ..its_models.statsmodels_its import StatsmodelsITSModel

@@ -11,6 +11,10 @@ statsmodels on time series data. It can handle both single dataset analysis and
 counterfactual analysis with multiple datasets.
 """
 
+import warnings
+# Suppress scipy stats warnings about small sample sizes
+warnings.filterwarnings("ignore", message=".*p-value may be inaccurate with fewer than 20 observations.*")
+
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -18,14 +22,13 @@ import statsmodels.formula.api as smf
 import os
 import glob
 import argparse
-import warnings
 import json
 from datetime import datetime, timedelta
 from causalimpact import CausalImpact
 from math import sqrt
 import sklearn.metrics as metrics
 
-# Suppress common warnings
+# Suppress other common warnings
 warnings.filterwarnings("ignore", message="DataFrame.fillna with 'method' is deprecated", category=FutureWarning)
 warnings.filterwarnings("ignore", message="DataFrame.applymap has been deprecated", category=FutureWarning)
 warnings.filterwarnings("ignore", message="Series.__getitem__ treating keys as positions is deprecated", category=FutureWarning)

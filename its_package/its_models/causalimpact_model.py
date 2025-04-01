@@ -60,7 +60,7 @@ class CausalImpactModel(BaseITSModel):
             if pre_data[col].nunique() == 1:
                 constant_val = pre_data[col].iloc[0]
                 # Add a small variation to avoid constant values
-                clean_data.loc[pre_period[1], col] = constant_val + 0.001
+                clean_data.loc[pre_period[1], col] = constant_val + 1
         
         # Store processed data
         self.data = clean_data
