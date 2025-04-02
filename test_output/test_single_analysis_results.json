@@ -1,0 +1,86 @@
+{
+    "events": [
+        "2024-01-01 07:30:00",
+        "2024-01-01 12:05:00"
+    ],
+    "causal_impact_results": {
+        "2024-01-01 07:30:00": {
+            "avg_effect": 11.185824827952535,
+            "cum_effect": 67.11494896771521,
+            "post_pred_mean": 111.98084183871413,
+            "post_pred_lower": 110.80152758846839,
+            "post_pred_upper": 113.16015608895988,
+            "model_summary": null
+        },
+        "2024-01-01 12:05:00": {
+            "avg_effect": -333.65179523628126,
+            "cum_effect": -2001.9107714176876,
+            "post_pred_mean": 400.4851285696146,
+            "post_pred_lower": 399.0802019958481,
+            "post_pred_upper": 401.89005514338106,
+            "model_summary": null
+        }
+    },
+    "statsmodels_results": {
+        "2024-01-01 07:30:00": {
+            "level_change": -83.85021645021635,
+            "slope_change": 1.5080519480519334,
+            "pvalue_level": 5.173263545419168e-09,
+            "pvalue_slope": 2.9658646649407e-09,
+            "r_squared": 0.9735522733741473,
+            "adj_r_squared": 0.9669403417176841,
+            "model_summary": "                            OLS Regression Results                            \n==============================================================================\nDep. Variable:                glucose   R-squared:                       0.974\nModel:                            OLS   Adj. R-squared:                  0.967\nMethod:                 Least Squares   F-statistic:                     147.2\nDate:                Tue, 01 Apr 2025   Prob (F-statistic):           9.92e-10\nTime:                        18:05:35   Log-Likelihood:                -30.378\nNo. Observations:                  16   AIC:                             68.76\nDf Residuals:                      12   BIC:                             71.85\nDf Model:                           3                                         \nCovariance Type:            nonrobust                                         \n==============================================================================\n                 coef    std err          t      P>|t|      [0.025      0.975]\n------------------------------------------------------------------------------\nIntercept    110.9455      1.096    101.188      0.000     108.557     113.334\ntime           0.0291      0.041      0.708      0.492      -0.060       0.119\npost         -83.8502      5.732    -14.629      0.000     -96.339     -71.362\ntime_post      1.5081      0.098     15.358      0.000       1.294       1.722\n==============================================================================\nOmnibus:                        4.131   Durbin-Watson:                   1.605\nProb(Omnibus):                  0.127   Jarque-Bera (JB):                1.733\nSkew:                           0.521   Prob(JB):                        0.420\nKurtosis:                       4.231   Cond. No.                         698.\n==============================================================================\n\nNotes:\n[1] Standard Errors assume that the covariance matrix of the errors is correctly specified."
+        },
+        "2024-01-01 12:05:00": {
+            "level_change": 29.56709956709954,
+            "slope_change": -0.6694372294372213,
+            "pvalue_level": 7.720399284268231e-09,
+            "pvalue_slope": 3.116427361185016e-10,
+            "r_squared": 0.9979150134666183,
+            "adj_r_squared": 0.9973937668332729,
+            "model_summary": "                            OLS Regression Results                            \n==============================================================================\nDep. Variable:                glucose   R-squared:                       0.998\nModel:                            OLS   Adj. R-squared:                  0.997\nMethod:                 Least Squares   F-statistic:                     1914.\nDate:                Tue, 01 Apr 2025   Prob (F-statistic):           2.41e-16\nTime:                        18:05:40   Log-Likelihood:                -14.262\nNo. Observations:                  16   AIC:                             36.52\nDf Residuals:                      12   BIC:                             39.61\nDf Model:                           3                                         \nCovariance Type:            nonrobust                                         \n==============================================================================\n                 coef    std err          t      P>|t|      [0.025      0.975]\n------------------------------------------------------------------------------\nIntercept     96.9091      0.400    241.997      0.000      96.037      97.782\ntime          -0.2848      0.015    -18.987      0.000      -0.318      -0.252\npost          29.5671      2.093     14.124      0.000      25.006      34.128\ntime_post     -0.6694      0.036    -18.667      0.000      -0.748      -0.591\n==============================================================================\nOmnibus:                        0.061   Durbin-Watson:                   0.625\nProb(Omnibus):                  0.970   Jarque-Bera (JB):                0.143\nSkew:                          -0.100   Prob(JB):                        0.931\nKurtosis:                       2.582   Cond. No.                         698.\n==============================================================================\n\nNotes:\n[1] Standard Errors assume that the covariance matrix of the errors is correctly specified."
+        }
+    },
+    "evaluation_results": {
+        "causalimpact": {
+            "single": [
+                {
+                    "event_index": 0,
+                    "MAE": 13.173792081778894,
+                    "MSE": 304.3252007477108,
+                    "RMSE": 17.44491905248376,
+                    "R2": -0.69882264334278,
+                    "MAPE": 9.865420712497508
+                },
+                {
+                    "event_index": 1,
+                    "MAE": 333.65179523628126,
+                    "MSE": 113145.78921205406,
+                    "RMSE": 336.3715047563543,
+                    "R2": -1701.1514465666305,
+                    "MAPE": 514.2200823757524
+                }
+            ]
+        },
+        "statsmodels": {
+            "single": [
+                {
+                    "event_index": 0,
+                    "MAE": 1.0055194805194914,
+                    "MSE": 2.6099567099567116,
+                    "RMSE": 1.6155360441527487,
+                    "R2": 0.9735522733741473,
+                    "MAPE": 0.853978825443614
+                },
+                {
+                    "event_index": 1,
+                    "MAE": 0.46590909090906063,
+                    "MSE": 0.3481601731601736,
+                    "RMSE": 0.5900509919999911,
+                    "R2": 0.9979150134666183,
+                    "MAPE": 0.5498854211601925
+                }
+            ]
+        }
+    }
+}

@@ -1,0 +1,9 @@
+{
+  "analysis_type": "single",
+  "data_path": "synthetic_data/data/ml_dataset.csv",
+  "max_events": 5,
+  "pre_window": "45min",
+  "post_window": "30min",
+  "run_time": "2025-04-01 16:16:56",
+  "success": true
+}
