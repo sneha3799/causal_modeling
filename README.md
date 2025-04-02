@@ -89,7 +89,7 @@ Our project addresses several key challenges in health-related causal inference:
 
 1. **Time Deconfounding**: Capturing exact causal effects in time series data
 2. **Autocorrelation**: Managing recursive effects where outcome at $t=t_i$ is affected by $t_{i-1}$
-3. **Individual Treatment Effects**: Identifying causal effects for specific individuals rather than population averages
+3. **Individual Treatment Effects / Conditional Average Treatment Effects**: Identifying causal effects for specific individuals rather than population averages
 4. **Continuous Treatments and Outcomes**: Handling non-binary treatments and continuous outcome variables
 
 ### Applied Methods
