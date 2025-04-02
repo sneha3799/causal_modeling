@@ -10,7 +10,7 @@ def test_single_analysis():
     pipeline = CausalAnalysisPipeline(output_dir="test_output")
     
     # Set data path (replace with your actual data path)
-    data_path = "synthetic_data/data/ml_dataset.csv"
+    data_path = "../synthetic_data/data/ml_dataset.csv"
     
     print(f"Running single dataset analysis with data from: {data_path}")
     
@@ -34,7 +34,7 @@ def test_counterfactual_analysis():
     pipeline = CausalAnalysisPipeline(output_dir="test_output")
     
     # Set data path (replace with your actual counterfactual data path)
-    data_path = "synthetic_data/data/dose_counterfactuals"
+    data_path = "../synthetic_data/data/dose_counterfactuals"
     
     print(f"Running counterfactual analysis with data from: {data_path}")
     

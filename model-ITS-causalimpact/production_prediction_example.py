@@ -5,7 +5,7 @@ from its_package.its_models.statsmodels_its import StatsmodelsITSModel
 from its_package.data_handling.data_loader import load_csv_data, clean_data_for_causalimpact
 
 # 1. Load sample data (historical data only)
-data = load_csv_data("synthetic_data/data/ml_dataset.csv")
+data = load_csv_data("../synthetic_data/data/ml_dataset.csv")
 cutoff_time = "2023-01-01 12:00:00"  # Some time point
 historical_data = data.loc[:cutoff_time].copy()
 

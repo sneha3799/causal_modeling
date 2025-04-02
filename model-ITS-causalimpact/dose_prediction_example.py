@@ -14,7 +14,7 @@ actual_dose = 5.0  # The dose used in the actual data/model
 counterfactual_doses = [0.0, 2.5, 7.5, 10.0]  # Doses to simulate
 
 # 3. Load some historical data for reference
-data = load_csv_data("synthetic_data/data/ml_dataset.csv")
+data = load_csv_data("../synthetic_data/data/ml_dataset.csv")
 pre_data = data.loc[intervention_time - pd.Timedelta(hours=1):intervention_time]
 
 # 4. Generate predictions with CausalImpact model
