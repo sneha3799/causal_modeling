@@ -46,110 +46,7 @@ Each data source provides specific health metrics:
 - **Stress**: Continuous stress level monitoring
 - **HRV**: Heart rate variability metrics and respiratory rate
 
-### Standardization Steps
-
-1. **Timestamp Standardization**
-   - Converts all timestamps to UTC
-   - Rounds to nearest minute
-   - Handles both naive and timezone-aware timestamps
-   - Logs any timestamp adjustments for verification
-
-2. **Duplicate Handling**
-   - First removes exact duplicates (all columns identical)
-   - Special handling for rows with same timestamp but different information:
-     
-     a. **Blood Glucose**:
-     - Prioritizes sensor readings using reporting of valid trend values (not 'NONE')
-     - If multiple readings with valid trends exist:
-       - Uses average if values are within 5% of each other
-       - Raises error if difference exceeds 5%
-     - Preserves associated metadata (trend direction, device info)
-     
-     b. **Insulin Doses**:
-     - Sums doses for same insulin type at same timestamp
-     - Example: At 2024-05-21 18:16:00
-       - DOSE_INSULIN: 4u + 1u = 5u total regular insulin
-       - DOSE_BASAL_INSULIN: 4u Toujeo (kept separate)
-     - Maintains separation between regular and basal insulin
-     - Preserves information about automatic vs manual doses
-     
-     c. **Food Amounts**:
-     - Sums carbohydrates for same food type at same timestamp
-     - Example: At 2024-05-21 18:16:00
-       - "Skittles": 5g + 10g = 15g total
-       - "Apple": 25g (kept separate)
-     - Maintains distinct glycemic indices
-     - Preserves meal vs snack categorization
-     
-     d. **Boolean Columns**:
-     - Uses OR operation for flags and indicators
-     - Examples:
-       - affects_fob (food on board): TRUE + FALSE = TRUE
-       - affects_iob (insulin on board): TRUE + FALSE = TRUE
-       - dose_automatic: FALSE + FALSE = FALSE
-     - Ensures no information loss for tracking active insulin/food
-
-3. **Data Quality Checks**
-   - Verifies no BGL values were modified during processing
-   - Checks for NaT (Not a Time) timestamps
-   - Validates data consistency across files
-   - Reports statistics on duplicates and adjustments
-
-4. **Merging Process**
-   - Concatenates data from multiple files
-   - Sorts by timestamp
-   - Handles overlapping time periods and inconsistent logging frequency
-   - Preserves all relevant metadata
-
-## Interactive Visualization
-
-The visualization tool (`data_standardization/visualize_health_data.py`) creates an interactive HTML plot combining all health metrics.
-
-### Features
-
-1. **Main Plot**
-   - Blood Glucose line (primary y-axis, 70-180 mg/dL target range)
-   - Normalized health metrics (secondary y-axis, 0-100 scale)
-   - Event markers (meals, insulin doses, etc.)
-   - Interactive legend for toggling metrics
-
-2. **Time Controls**
-   - Range slider for time window selection
-   - Quick selection buttons (6h, 12h, 1d, 3d, 1w, All)
-   - Pan and zoom capabilities
-
-3. **Hover Information**
-   - Original values for all metrics
-   - Normalized values where applicable
-   - Timestamps and event details
-   - Trend information for CGM readings
-
-4. **Metric Details Panel**
-   - Dynamic updates based on selected metrics
-   - Shows scale, description, and data processing info
-   - Measurement frequency for each metric
-   - Organized in a grid layout
-
-### How to Use
-
-1. **Running the Visualization**
-   ```bash
-   python data_standardization/visualize_health_data.py
-   ```
-   This generates `docs/index.html` which can be viewed at https://blood-glucose-control.github.io/causal_modeling/
-
-2. **Understanding the Metrics**
-   - Blood Glucose: Original scale (mg/dL)
-   - Sleep Metrics: Normalized from minutes to 0-100 scale
-   - Stress Score: Original 0-100 scale
-   - HRV: Normalized from milliseconds to 0-100 scale
-
-3. **Event Types**
-   - DOSE_INSULIN: Regular insulin doses
-   - DOSE_BASAL_INSULIN: Long-acting insulin
-   - ANNOUNCE_MEAL: Meal announcements
-   - INTERVENTION_SNACK: Fast-acting carbs
-   - BGL_FP_READING: Finger prick readings
+Visualization of the standardized data is available too.
 
 ## Part 2: Causal Modeling
 
@@ -157,7 +54,15 @@ The visualization tool (`data_standardization/visualize_health_data.py`) creates
 This section focuses on building causal models to model how different insulin timing and dosage decisions affect blood glucose levels as counterfcatuals to the observed blood glucose evolution over time. The goal is to understand counterfactuals in order to build intuition with an interactive method - "What if insulin was taken at a different time?" or "What if the dose was different?"
 
 ### Methodology
-TBC
+For our project we needed researched methods that handle:
+* Time deconfounding
+* Autocorrelation
+* CATEs/ITEs rather than ATEs, i.e. causal effect on one person with any particular characteristics rather than a group
+* Non-binary treatments and outcomes - since treatments are not binary, and neither is our outcome of intrest (note that we can discretize continuous values but not reduce to binary).
 
-### Usage
-TBC
+Our project builds on the following methods to find best suited methods that satisfy the above:
+* T4 - [Estimating treatment effects for time-to-treatment antibiotic stewardship in sepsis
+](https://pmc.ncbi.nlm.nih.gov/articles/PMC10135432/)
+* the Causal Transformer - [Causal Transformer for Estimating Counterfactual Outcomes](https://arxiv.org/abs/2204.07258)
+* G-Net - [A Recurrent Network Approach to G-Computation for Counterfactual Prediction Under a Dynamic Treatment Regime](https://proceedings.mlr.press/v158/li21a.html)
+* Interupted Time Series with [causalimpact](https://pypi.org/project/causalimpact/)
