@@ -1,5 +1,8 @@
 # Diabetes Causal Modeling
 
+![Wat AI_Card_-_Causal_Modeling](https://github.com/user-attachments/assets/ffad25e7-90c9-4767-978a-bba8e56b0f8f)
+
+
 ## Project Overview
 This repository implements a comprehensive pipeline for processing multi-source health data and building causal models to understand the impact of insulin timing and dosage on blood glucose levels.
 
