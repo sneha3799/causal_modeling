@@ -79,6 +79,7 @@ class SyntheticGlurooDataset(Dataset):
         
         output = {
             'glucose': glucose_seq,
+            'glucose_factual': glucose_seq,
             'carbs': carbs_seq,
             'insulin': insulin_seq,
             'exercise': exercise_seq,
@@ -102,6 +103,7 @@ class SyntheticGlurooDataset(Dataset):
         num_samples = data.shape[0] - seq_length + 1
         
         glucose_seq = np.zeros((num_samples, seq_length))
+        glucose_seq_factual = np.zeros((num_samples, seq_length))
         carbs_seq = np.zeros((num_samples, seq_length))
         insulin_seq = np.zeros((num_samples, seq_length))
         exercise_seq = np.zeros((num_samples, seq_length))
@@ -125,39 +127,55 @@ class SyntheticGlurooDataset(Dataset):
             counterfactual_carb_impact[0] *= 0.5
             
             glucose_half_carb = glucose_factual.copy()
-            for t in range(seq_length - 1):
-                target_glucose = (
-                    glucose_half_carb[t] + counterfactual_carb_impact[t + 1] * counterfactual_carbs[t] -
-                    insulin_sensitivity[t + 1] * factual_insulin[t]
-                )
-                glucose_half_carb[t + 1] = 0.9 * glucose_half_carb[t] + 0.1 * target_glucose
+            
+            if i<8000:
+                for t in range(seq_length - 1):
+                    target_glucose = (
+                        glucose_half_carb[t] + counterfactual_carb_impact[t + 1] * counterfactual_carbs[t] -
+                        insulin_sensitivity[t + 1] * factual_insulin[t]
+                    )
+                    glucose_half_carb[t + 1] = 0.9 * glucose_half_carb[t] + 0.1 * target_glucose
+                
+                change_glucose = glucose_half_carb
+                factual_carbs = counterfactual_carbs
+                carb_absorption = counterfactual_carb_impact
             
             # Counterfactual 2: Delaying meal by 1 time step
             counterfactual_carbs_1 = np.zeros_like(factual_carbs)
             counterfactual_carbs_1[1:] = factual_carbs[:-1]
             
             glucose_delayed_meal = glucose_factual.copy()
-            for t in range(seq_length - 1):
-                target_glucose = (
-                    glucose_delayed_meal[t] + carb_absorption[t + 1] * counterfactual_carbs_1[t] -
-                    insulin_sensitivity[t + 1] * factual_insulin[t]
-                )
-                glucose_delayed_meal[t + 1] = 0.9 * glucose_delayed_meal[t] + 0.1 * target_glucose
-                glucose_delayed_meal[t + 1] = np.clip(glucose_delayed_meal[t + 1], 50, 300)
+            
+            if 8000 <= i < 16000:
+                for t in range(seq_length - 1):
+                    target_glucose = (
+                        glucose_delayed_meal[t] + carb_absorption[t + 1] * counterfactual_carbs_1[t] -
+                        insulin_sensitivity[t + 1] * factual_insulin[t]
+                    )
+                    glucose_delayed_meal[t + 1] = 0.9 * glucose_delayed_meal[t] + 0.1 * target_glucose
+                
+                change_glucose = glucose_delayed_meal
+                factual_carbs = counterfactual_carbs_1            
             
             # Counterfactual 3: Doubling First Insulin Dose
             counterfactual_insulin = factual_insulin.copy()
             counterfactual_insulin[0] *= 2.0
             
             glucose_double_insulin = glucose_factual.copy()
-            for t in range(seq_length - 1):
-                target_glucose = (
-                    glucose_double_insulin[t] + carb_absorption[t + 1] * factual_carbs[t] -
-                    insulin_sensitivity[t + 1] * counterfactual_insulin[t]
-                )
-                glucose_double_insulin[t + 1] = 0.9 * glucose_double_insulin[t] + 0.1 * target_glucose
+            
+            if i >= 16000:
+                for t in range(seq_length - 1):
+                    target_glucose = (
+                        glucose_double_insulin[t] + carb_absorption[t + 1] * factual_carbs[t] -
+                        insulin_sensitivity[t + 1] * counterfactual_insulin[t]
+                    )
+                    glucose_double_insulin[t + 1] = 0.9 * glucose_double_insulin[t] + 0.1 * target_glucose
                 
-            glucose_seq[i] = glucose_factual
+                change_glucose = glucose_double_insulin
+                factual_insulin = counterfactual_insulin
+                
+            glucose_seq[i] = change_glucose
+            glucose_seq_factual[i] = glucose_factual
             carbs_seq[i] = factual_carbs
             insulin_seq[i] = factual_insulin
             exercise_seq[i] = selected_data['exercise'].values
@@ -168,6 +186,7 @@ class SyntheticGlurooDataset(Dataset):
         
         output = {
             'glucose': glucose_seq,
+            'glucose_factual': glucose_seq_factual,
             'carbs': carbs_seq,
             'insulin': insulin_seq,
             'exercise': exercise_seq,

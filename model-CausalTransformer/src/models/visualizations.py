@@ -12,6 +12,7 @@ def plot_predictions(pickle_file):
     # Extract predictions and true values
     y_pred = data["y_pred"]
     y_true = data["y_true"]
+    y_factual = data["y_factual"]
 
     # Reshape or select a specific time step
     # y_pred = y_pred[:, 0, 0]  # Select the first time step for plotting
@@ -20,12 +21,14 @@ def plot_predictions(pickle_file):
     # Reshape to (25909, 11) for plotting
     y_pred = y_pred.squeeze(-1)
     y_true = y_true.squeeze(-1)
+    y_factual = y_factual.squeeze(-1)
 
     # Plot multiple sequences
     plt.figure(figsize=(12, 6))
 
     plt.plot(y_true[0], label=f"True", linestyle="--", alpha=0.5, color="blue")
     plt.plot(y_pred[0], label=f"Pred", alpha=0.5, color="red")
+    plt.plot(y_factual[0], label=f"Factual", alpha=0.5, color="green")
 
     # for i in range(10):  # Plot only 10 samples for readability
     #     plt.plot(y_true[i], label=f"True {i+1}", linestyle="--", alpha=0.5, color="blue")
@@ -73,6 +76,7 @@ def plot_predictions(pickle_file):
         if frame < len(axes):  # Ensure we don't exceed available subplots
             axes[frame].plot(y_true[frame], 'b-', label="True", alpha=0.7)
             axes[frame].plot(y_pred[frame], 'r-', label="Predicted", alpha=0.7)
+            axes[frame].plot(y_factual[frame], 'g-', label="Factual", alpha=0.7)
             axes[frame].set_title(f"Frame {frame}")
             axes[frame].set_xticks([])
             axes[frame].set_yticks([])

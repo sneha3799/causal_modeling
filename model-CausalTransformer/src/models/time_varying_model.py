@@ -227,6 +227,7 @@ class TimeVaryingCausalModel(LightningModule):
                 pickle.dump({
                     "y_pred": outputs_unscaled,
                     "y_true": dataset.data['unscaled_outputs'],
+                    "y_factual": dataset.data['unscaled_outputs_factual']
                 }, f)
             print('+++++ 1')
             # Run the script and pass the pickle file as argument
@@ -245,7 +246,8 @@ class TimeVaryingCausalModel(LightningModule):
             with open(f'outputs_{timestamp}.pkl', 'wb') as f:
                 pickle.dump({
                     "y_pred": outputs_scaled,
-                    "y_true": dataset.data['outputs']
+                    "y_true": dataset.data['outputs'],
+                    "y_factual": dataset.data['outputs_factual']
                 }, f)
             print('+++++ 2')
             # Run the script and pass the pickle file as argument
